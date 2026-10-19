@@ -114,8 +114,7 @@ export const MIN_TEXT = 40;
 /** Display line-height: 0.92-0.98. Body: 1.24-1.7. */
 export const DISPLAY_LEADING = 0.95;
 
-// TODO(AIKO): confirm the Instagram/TikTok handle before the first render that posts.
-export const HANDLE = "@aikogroup";
+export const HANDLE = "@aikogroup.ai";
 
 /** The wordmark: roman caps AIKO and italic Group, with a rule above. There is
  *  no symbol; the rule is the mark. `size` is the type size in px. Colours

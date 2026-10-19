@@ -804,7 +804,7 @@
         var d = new Date(base); d.setDate(base.getDate() + i);
         var pad = function (n) { return String(n).padStart(2, '0'); };
         f.rows[id] = { date: d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()), time: i % 2 ? '12:00' : '09:00',
-          caption: (v.hook ? v.hook + '\n\n' : '') + 'Follow @thebuyboxre for more.', yt: (v.topic || '').slice(0, 100), open: false };
+          caption: (v.hook ? v.hook + '\n\n' : '') + 'Follow @aikogroup.ai for more.', yt: (v.topic || '').slice(0, 100), open: false };
       });
       f.plats = null;
       go('schedule');

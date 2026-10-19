@@ -34,7 +34,7 @@ const REMOTION_ROOT = `${PROJECT_ROOT}/remotion`
 const HOOK_LIBRARY_PATH = `${PROJECT_ROOT}/hook_templates_1000.json`
 // The follow handle the closing frame shows. Keep it the same as HANDLE in
 // remotion/src/brand.ts, which is what the video actually draws.
-const HANDLE = '@aikogroup'
+const HANDLE = '@aikogroup.ai'
 const ENV_HINT = (BAKED_ROOT || ARGS.root)
   ? 'the ELEVENLABS_API_KEY environment variable (already set on this runner)'
   : `${PROJECT_ROOT}/.env (ELEVENLABS_API_KEY)`
