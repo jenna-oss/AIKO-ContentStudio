@@ -1,0 +1,118 @@
+name: Weekly hook patterns
+
+# Refreshes the Spyglass hook and ad-angle corpus.
+#
+# Weekly, not daily, and separate from the ad pull: Spyglass bills credits per
+# row returned, and creative structure moves far more slowly than ad inventory.
+# Seven brands x two insight types is fourteen calls a week.
+#
+# No browser here, so this job is small and fast — the ad pull's Chromium
+# install is the slow part and is not needed to call an API.
+
+on:
+  # Off until the AIKO sources replace Trilith's; restore to run on a timer.
+  # schedule:
+  #   - cron: '0 12 * * 1'   # Mondays 12:00 UTC
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: weekly-hook-patterns
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Both scripts skip themselves with a note when their secret is absent,
+      # so this job stays green until the keys are wired up.
+      - name: Pull from Spyglass
+        env:
+          SPYGLASS_API_KEY: ${{ secrets.SPYGLASS_API_KEY }}
+        run: node tools/pull-spyglass.mjs
+
+      # The creative wall: the actual ads the board lenders are running, with
+      # their media and current run lengths. Weekly for the same reason as the
+      # patterns — credits are billed per row.
+      #
+      # Not allowed to sink the job. The wall refusing to write keeps last
+      # week's cards, which is a stale section; letting it fail the run throws
+      # away the hook patterns harvested above it, which is a stale corpus and
+      # a wasted week of credits. The daily pull learned this ordering the hard
+      # way — the same rule belongs here.
+      - name: Pull creatives from Spyglass
+        id: creatives
+        continue-on-error: true
+        env:
+          SPYGLASS_API_KEY: ${{ secrets.SPYGLASS_API_KEY }}
+        run: node tools/pull-creatives.mjs
+
+      # Spyglass hands back frame zero, and many of these ads open on black, so
+      # the wall filled up with empty grey boxes. Swap those for a real frame.
+      # Not on the runner image, so install it; the script exits clean without
+      # ffmpeg rather than failing, and this step must not sink the harvest.
+      - name: Install ffmpeg
+        continue-on-error: true
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Replace blank thumbnails
+        continue-on-error: true
+        run: node tools/thumbs.mjs
+
+      # Rebuilds the wall and the figures on the briefing from whatever has
+      # just been harvested. Safe with no data: every region is optional.
+      - name: Render the briefing
+        run: node tools/render.mjs
+
+      # Commit before pushing to the database, for the same reason the ad pull
+      # does: the harvest is the thing that costs money and cannot be repeated
+      # for free, so it lands in git before anything else can fail.
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/hook-patterns.json data/creatives.json briefing.html assets/thumbs
+          if git diff --staged --quiet; then
+            echo "No change in hook patterns or creative this week."
+            exit 0
+          fi
+          git commit -m "Weekly hook patterns: $(date -u +%Y-%m-%d)"
+
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected — rebasing onto origin/main and retrying."
+            git pull --rebase --autostash origin main || {
+              echo "::error::Rebase failed; leaving the branch untouched."
+              exit 1
+            }
+          done
+          echo "::error::Could not push after 3 attempts."
+          exit 1
+
+      # Loud, but after everything that can still succeed has. A wall quietly
+      # serving month-old cards under a heading that says "right now" is the
+      # thing this warning exists to stop.
+      - name: Flag a stale creative wall
+        if: steps.creatives.outcome == 'failure'
+        run: |
+          echo "::warning::The creative wall did not refresh; briefing.html still shows the previous harvest."
+          echo "Read the 'first row:' line in the creatives step — the response shape has probably changed again."
+
+      - name: Push to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node tools/push-hook-patterns.mjs

@@ -1,0 +1,197 @@
+name: Cut footage
+
+# A long take in, short vertical videos out.
+#
+# The Worker starts this when an upload finishes. It cannot do the work itself:
+# ffmpeg and Remotion do not run in a Worker, and a take is gigabytes.
+#
+#   fetch  →  pull out the audio  →  transcribe it with word timings
+#          →  pick the passages worth cutting  →  cut, caption, store
+#
+# The picking is allowed to come back with nothing, and often should. A take
+# with two real openings in it makes two clips, not five.
+#
+# The raw take is left where it is. Clips are what you keep, but the original
+# is what you would re-cut from, and storage is cheaper than re-filming.
+
+run-name: Cut a take into shorts
+
+on:
+  workflow_dispatch:
+    inputs:
+      footage_id:
+        description: The take to cut
+        required: false
+        type: string
+      clip_id:
+        description: Set by the app to re-cut one edited clip (trim, sections cut out, caption fixes). Leave blank to cut a whole take.
+        required: false
+        type: string
+
+permissions:
+  contents: read
+
+# One run per take, or per edited clip. A second run while the first is still
+# cutting would fight it over the same rows.
+concurrency:
+  group: cut-footage-${{ inputs.clip_id != '' && format('clip-{0}', inputs.clip_id) || inputs.footage_id }}
+  cancel-in-progress: false
+
+jobs:
+  cut:
+    runs-on: ubuntu-latest
+    timeout-minutes: 120
+
+    env:
+      SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+      SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+      ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+      # The repo secret is named ANTHROPIC_API; everything here reads
+      # ANTHROPIC_API_KEY.
+      ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+      FOOTAGE_ID: ${{ inputs.footage_id }}
+      CLIP_ID: ${{ inputs.clip_id }}
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Find the take
+        run: |
+          node --input-type=module -e '
+            const base = process.env.SUPABASE_URL.replace(/\/+$/, "");
+            const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+            const call = (fn, args) => fetch(base + "/rest/v1/rpc/" + fn, {
+              method: "POST",
+              headers: { apikey: key, authorization: "Bearer " + key, "content-type": "application/json" },
+              body: JSON.stringify(args),
+            });
+            const fs = await import("node:fs");
+            let footageId = process.env.FOOTAGE_ID;
+            if (process.env.CLIP_ID) {
+              const c = await call("kb_clip_read", { p_id: process.env.CLIP_ID });
+              const clip = c.ok ? await c.json() : null;
+              if (!clip || !clip.footage_id) throw new Error("no clip with that id");
+              footageId = clip.footage_id;
+              fs.appendFileSync(process.env.GITHUB_ENV, `FOOTAGE_ID=${footageId}\n`);
+            }
+            const res = await call("kb_footage_read", { p_id: footageId });
+            if (!res.ok) throw new Error("could not read the take: " + res.status);
+            const take = await res.json();
+            if (!take || !take.storage_path) throw new Error("no take with that id");
+            fs.appendFileSync(process.env.GITHUB_ENV, `TAKE_PATH=${take.storage_path}\n`);
+            fs.appendFileSync(process.env.GITHUB_ENV, `TAKE_NAME=${(take.name || "take").replace(/\n/g, " ")}\n`);
+            console.log("take:", take.name, "—", take.storage_path);
+          '
+
+      - name: Fetch it
+        run: |
+          curl -fsSL --retry 3 --retry-delay 5 \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            "$SUPABASE_URL/storage/v1/object/kb-footage/$TAKE_PATH" \
+            -o "/tmp/take.${TAKE_PATH##*.}"
+          echo "TAKE_FILE=/tmp/take.${TAKE_PATH##*.}" >> "$GITHUB_ENV"
+          ls -lh "/tmp/take.${TAKE_PATH##*.}"
+
+      # A few gigabytes of video is about ten megabytes of mono speech, and
+      # only the speech is any use to a transcriber.
+      - name: Pull out the audio
+        if: env.CLIP_ID == ''
+        run: |
+          ffmpeg -nostdin -hide_banner -loglevel error -y \
+            -i "$TAKE_FILE" -vn -ac 1 -ar 16000 -b:a 64k /tmp/audio.mp3
+          ls -lh /tmp/audio.mp3
+
+      - name: Transcribe it
+        if: env.CLIP_ID == ''
+        run: node video/footage-transcribe.mjs "$FOOTAGE_ID" /tmp/audio.mp3
+
+      # Which seconds are full-frame title cards rather than him. A card
+      # centre-cropped to 9:16 is an unreadable fragment of a word, so the
+      # picker is not allowed to choose a passage containing one.
+      - name: Find the title cards
+        if: env.CLIP_ID == ''
+        run: node video/footage-slides.mjs "$TAKE_FILE" > /tmp/slides.json
+
+      - name: Pick what is worth cutting
+        id: pick
+        if: env.CLIP_ID == ''
+        # pipefail: without it the step's status is tee's, so a picker that
+        # fell over went green and the run carried on cutting.
+        run: |
+          set -o pipefail
+          node video/footage-pick.mjs "$FOOTAGE_ID" /tmp/slides.json | tee /tmp/pick.log
+          grep -o 'CLIPS=[0-9]*' /tmp/pick.log | tail -1 >> "$GITHUB_OUTPUT"
+
+      - name: Install the renderer
+        if: env.CLIP_ID != '' || steps.pick.outputs.CLIPS != '0'
+        working-directory: video/remotion
+        run: npm ci
+
+      - name: Cut, caption and store
+        if: env.CLIP_ID == '' && steps.pick.outputs.CLIPS != '0'
+        run: node video/footage-cut.mjs "$FOOTAGE_ID" "$TAKE_FILE"
+
+      # An edit made in the app: one clip, re-cut from the same take with its
+      # new start and end, sections taken out, and words fixed.
+      - name: Re-cut the edited clip
+        if: env.CLIP_ID != ''
+        run: node video/footage-cut.mjs --edit "$CLIP_ID" "$TAKE_FILE"
+
+      - name: Say so when nothing could be cut
+        if: env.CLIP_ID == '' && steps.pick.outputs.CLIPS == '0'
+        run: echo "Nothing in this take opened cleanly enough to make a short. The transcript is kept."
+
+      # Whatever went wrong, the take should say so rather than sit on
+      # 'transcribing' for ever.
+      # Only when nothing more useful was recorded. The scripts write the real
+      # reason as they fail, and "your subscription has a failed payment" is
+      # worth far more than "the run did not finish" — which is precisely what
+      # this step used to overwrite it with.
+      - name: Record a clip edit that fell over
+        if: failure() && env.CLIP_ID != ''
+        run: |
+          node --input-type=module -e '
+            const base = process.env.SUPABASE_URL.replace(/[/]+$/, "");
+            const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+            const call = (fn, args) => fetch(base + "/rest/v1/rpc/" + fn, {
+              method: "POST",
+              headers: { apikey: key, authorization: "Bearer " + key, "content-type": "application/json" },
+              body: JSON.stringify(args),
+            });
+            const res = await call("kb_clip_read", { p_id: process.env.CLIP_ID });
+            const clip = res.ok ? await res.json() : null;
+            if (clip && clip.edit_status === "failed") console.log("the reason is already on the clip:", clip.edit_error);
+            else await call("kb_clip_edit_state", { p_id: process.env.CLIP_ID, p_status: "failed", p_error: "The edit run did not finish. See the Actions log." });
+          ' || true
+
+      - name: Record a run that fell over
+        if: failure() && env.CLIP_ID == ''
+        run: |
+          node --input-type=module -e '
+            const base = process.env.SUPABASE_URL.replace(/[/]+$/, "");
+            const key = process.env.SUPABASE_SERVICE_ROLE_KEY;
+            const call = (fn, args) => fetch(base + "/rest/v1/rpc/" + fn, {
+              method: "POST",
+              headers: { apikey: key, authorization: "Bearer " + key, "content-type": "application/json" },
+              body: JSON.stringify(args),
+            });
+            const res = await call("kb_footage_read", { p_id: process.env.FOOTAGE_ID });
+            const take = res.ok ? await res.json() : null;
+            if (take && take.status === "failed" && (take.error || "").trim()) {
+              console.log("the reason is already on the take:", take.error);
+            } else {
+              await call("kb_footage_state", {
+                p_id: process.env.FOOTAGE_ID,
+                p_status: "failed",
+                p_error: "The cutting run did not finish. See the Actions log.",
+              });
+            }
+          ' || true

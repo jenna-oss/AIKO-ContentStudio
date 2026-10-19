@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Moved — Ask &amp; brainstorm</title>
+<!-- This page was retired. It answered questions by putting the whole ad
+     corpus in the prompt; the ideas page does the same job by retrieving, and
+     counts exactly instead of tallying text.
+
+     Kept as a redirect rather than deleted: this URL was shared, and a 404
+     reads as an outage. Meta refresh plus a script so it works either way, and
+     a real link so it works with neither. -->
+<meta http-equiv="refresh" content="0; url=./">
+<link rel="canonical" href="./">
+<style>
+  :root {
+    --ground:#ECE9D8; --card:#F4F2E7; --ink:#103224; --ink-body:#3B5850;
+    --rule:#D2CDB6; --accent:#2C785E;
+    --sans:"Poppins","Century Gothic","Avenir Next",system-ui,-apple-system,sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root { --ground:#072A1F; --card:#0E3B2C; --ink:#EAE9D5; --ink-body:#B9C9C0;
+            --rule:#1C4A3A; --accent:#6E9C86; }
+  }
+  body {
+    margin:0; min-height:100vh; display:flex; align-items:center; justify-content:center;
+    background:var(--ground); color:var(--ink-body); font-family:var(--sans);
+    font-size:16px; line-height:1.6; padding:1.5rem;
+  }
+  .card {
+    background:var(--card); border:1px solid var(--rule); border-left:3px solid var(--accent);
+    border-radius:4px; padding:1.25rem 1.5rem; max-width:34rem;
+  }
+  h1 { margin:0 0 .5rem; font-size:1.0625rem; color:var(--ink); }
+  p { margin:0 0 .75rem; font-size:.875rem; }
+  p:last-child { margin-bottom:0; }
+  a { color:var(--accent); font-weight:600; }
+</style>
+</head>
+<body>
+  <div class="card">
+    <h1>This page moved</h1>
+    <p>
+      Ask the corpus is now part of <a href="./">Ask &amp; brainstorm</a>,
+      which answers the same questions and proposes content from the same page.
+    </p>
+    <p>Redirecting you now — <a href="./">go there directly</a>.</p>
+  </div>
+  <script>location.replace('./');</script>
+</body>
+</html>

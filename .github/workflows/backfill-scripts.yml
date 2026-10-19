@@ -1,0 +1,63 @@
+name: Backfill scripts
+
+# Saves the narration lines of videos stored before the Edit page's script
+# panel existed, so their lines can be edited there too. Videos stored since
+# get theirs from the render workflow's store job.
+#
+# Reads each video's kept source from the private video-sources bucket, reads
+# LINES from its voiceover script with video/script-lines.py (parsed, never
+# run), and saves them with kb_video_set_script. Only videos with a kept source
+# and no saved script are looked at, so running it again is harmless.
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: video
+
+      - name: Save the scripts that are missing
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          set -euo pipefail
+          BASE="${SUPABASE_URL%/}"
+          AUTH=(-H "apikey: $SUPABASE_SERVICE_ROLE_KEY" -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          RETRY=(--retry 4 --retry-delay 8 --retry-connrefused)
+
+          rows=$(curl -sS --fail-with-body "${RETRY[@]}" -X POST "$BASE/rest/v1/rpc/kb_video_scripts_missing" \
+            "${AUTH[@]}" -H 'content-type: application/json' -d '{}')
+          echo "$(printf '%s' "$rows" | jq length) video(s) with a kept source and no saved script"
+
+          saved=0
+          while IFS=$'\t' read -r id src; do
+            [ -n "$id" ] || continue
+            rm -f /tmp/source.tar.gz
+            if ! curl -sS --fail-with-body "${RETRY[@]}" "$BASE/storage/v1/object/video-sources/$src" \
+                 "${AUTH[@]}" -o /tmp/source.tar.gz; then
+              echo "::warning::$id: could not download its source ($src)"
+              continue
+            fi
+            lines=$(python3 video/script-lines.py /tmp/source.tar.gz 2>/dev/null) || lines=null
+            if ! printf '%s' "$lines" | jq -e 'type == "array"' > /dev/null 2>&1; then
+              echo "::warning::$id: no narration lines found in its voiceover script"
+              continue
+            fi
+            curl -sS --fail-with-body "${RETRY[@]}" -X POST "$BASE/rest/v1/rpc/kb_video_set_script" \
+              "${AUTH[@]}" -H 'content-type: application/json' \
+              -d "$(jq -n --arg i "$id" --argjson s "$lines" '{p_render_id: $i, p_script: $s}')" > /dev/null
+            saved=$((saved + 1))
+            echo "$id: saved $(printf '%s' "$lines" | jq length) lines"
+          done < <(printf '%s' "$rows" | jq -r '.[] | [.id, .source_path] | @tsv')
+
+          echo "### Saved the script of $saved video(s)" >> "$GITHUB_STEP_SUMMARY"

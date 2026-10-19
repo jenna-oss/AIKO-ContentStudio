@@ -1,0 +1,9 @@
+{
+  "_about": "How the narrator should say words it gets wrong. Every video and every edit uses this list: numeric_tts.spoken_text() swaps each word for its spoken form before the line goes to the voice, and the captions still show the word as written. Keys are the written word in lower case, one entry per form (refinance, refinancing...). An edit that fixes a pronunciation adds to this list, and the render workflow's pronunciations job commits it back here.",
+  "words": {
+    "refinance": "re-finance",
+    "refinanced": "re-financed",
+    "refinances": "re-finances",
+    "refinancing": "re-financing"
+  }
+}

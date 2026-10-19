@@ -1,0 +1,1084 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Library — Content studio</title>
+<script src="./assets/theme.js"></script>
+<script src="./assets/auth.js"></script>
+<link rel="stylesheet" href="./assets/app.css">
+<style>
+  /* Only what the Library needs beyond app.css. */
+  .lib-list { display:flex; flex-direction:column; gap:10px; }
+  .lib-card { padding:14px 18px; display:flex; flex-direction:column; gap:6px; min-width:0; }
+  .lib-card .name { font-weight:600; flex:1 1 180px; min-width:0; overflow-wrap:anywhere; }
+  .lib-acts { gap:4px; }
+  .lib-intro { justify-content:space-between; }
+  .lib-intro .quiet { flex:1 1 260px; }
+  .hook { font-size:14px; overflow-wrap:anywhere; }
+  .transcript {
+    font-size:14px; border-left:3px solid #407C62; padding:4px 12px; max-height:260px; overflow-y:auto;
+    white-space:pre-wrap; overflow-wrap:anywhere;
+  }
+  .lib-card audio { width:100%; max-width:520px; height:40px; }
+  .rec-dot { width:12px; height:12px; border-radius:999px; background:var(--clay); flex-shrink:0; animation:pl 1.4s ease-in-out infinite; }
+  @media (prefers-reduced-motion: reduce) { .rec-dot { animation:none; } }
+  .inline-field { flex:1 1 180px; min-height:36px; padding:6px 10px; }
+  .lines { list-style:none; margin:4px 0 0; padding:0; display:flex; flex-direction:column; gap:4px; }
+  .lines li { display:grid; grid-template-columns:22px minmax(0, 1fr); gap:8px; align-items:start; }
+  .lines .n { font-family:var(--mono); font-size:11px; color:var(--quiet); padding-top:12px; text-align:right; }
+  .lines .sline { padding:0; }
+  .lines textarea { font-size:14px; line-height:1.45; min-height:0; }
+  .kind { font-family:var(--mono); font-size:10px; font-weight:700; color:var(--emerald); min-width:30px; }
+  :root[data-theme="dark"] .kind { color:#8FC2A9; }
+  .file-row { padding:12px 18px; gap:10px; }
+  .file-row .name { flex:1 1 200px; }
+  .say { font-size:13px; color:var(--quiet); margin:0; }
+  .say.bad { color:var(--clay); }
+</style>
+</head>
+<body>
+
+<main class="page narrow">
+  <h1>Library</h1>
+  <div id="next"></div>
+  <div role="tablist" aria-label="Library" class="subtabs" id="tabs"></div>
+
+  <section role="tabpanel" id="panel-scripts" aria-labelledby="tab-scripts" class="stack" hidden>
+    <div class="row lib-intro">
+      <span class="ink">Scripts Aiko wrote for you to read to camera. Film one, then upload the video, and it’s cut into short clips for you.</span>
+      <a class="btn btn-s btn-sm" href="./?start=film">Write a script</a>
+    </div>
+    <div class="lib-list" id="scripts-list"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-recordings" aria-labelledby="tab-recordings" class="stack" hidden>
+    <p class="ink" style="margin: 0">Talk an idea through, or upload a call or voice memo. Aiko reads these when it plans videos with you. They’re never posted.</p>
+    <div class="card lib-card" id="recorder" style="gap: 10px"></div>
+    <div class="lib-list" id="recordings-list"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-footage" aria-labelledby="tab-footage" class="stack" hidden>
+    <div class="row lib-intro">
+      <span class="ink">Long videos of you talking. Each one is cut into short, captioned clips automatically, and the clips go to Videos › To review. Nothing posts until you approve and schedule it.</span>
+      <a class="btn btn-s btn-sm" href="./?start=upload">Upload a video of you</a>
+    </div>
+    <div class="lib-list" id="footage-list"></div>
+  </section>
+
+  <section role="tabpanel" id="panel-files" aria-labelledby="tab-files" class="stack" hidden>
+    <span class="ink">Articles, notes and links you want Aiko to know about. It reads them when it plans ideas and writes scripts. They’re never posted. Links you paste in a chat with Aiko are kept here too.</span>
+    <div class="row" style="gap: 8px">
+      <label class="sr-only" for="kb-type">What kind of file</label>
+      <select class="field" id="kb-type" style="min-height: 40px">
+        <option value="transcript">Transcript</option>
+        <option value="research">Research</option>
+        <option value="report">Report</option>
+        <option value="article">Article</option>
+        <option value="interview">Interview</option>
+        <option value="other" selected>Other</option>
+      </select>
+      <button type="button" class="btn btn-s btn-sm" id="kb-add">Add notes for Aiko</button>
+      <input type="file" id="kb-file" accept=".txt,.md,.csv,.tsv,.json,.vtt,.srt,text/plain,text/markdown,text/csv,application/json,text/vtt" hidden>
+    </div>
+    <p class="say" id="kb-say" role="status" hidden></p>
+    <div class="lib-list" id="files-list"></div>
+  </section>
+</main>
+
+<script src="./assets/shell.js"></script>
+<script>
+/* The Library: everything kept to make videos from. Scripts to film,
+   recordings that were transcribed, long takes that are cut into clips, and
+   the text files Aiko searches when it plans. Replaces scripts.html,
+   recordings.html and the take list that used to sit on edit.html. */
+const A = window.AikoApp;
+const el = A.el;
+A.header('library');
+A.nextUp(document.getElementById('next'));
+
+const $ = (id) => document.getElementById(id);
+const MON = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const tidy = (s) => String(s).replace(/\s+/g, ' ').trim();
+const day = (iso) => (iso ? A.fmtDay(iso) : '');
+const mins = (s) => (s ? A.clock(Math.round(s)) : '');
+const gb = (n) => (n >= 1e9 ? (n / 1e9).toFixed(1) + 'GB' : Math.max(1, Math.round(n / 1e6)) + 'MB');
+const words = (n) => (n ? Number(n).toLocaleString() + ' words' : '');
+const metaLine = (parts) => parts.filter(Boolean).join(' · ');
+
+/* --- tabs ----------------------------------------------------------------
+
+   The chosen tab lives in the URL (?tab=recordings) so another page can link
+   straight to it and a refresh lands in the same place. */
+/* Two kinds of thing live here, and the tab bar says which is which: what
+   you give Aiko to read, and what is for filming. */
+const TABS = [['recordings', 'Recordings'], ['files', 'Notes & links'], ['scripts', 'Scripts'], ['footage', 'Your videos']];
+const GROUPS = { recordings: 'For Aiko to read', scripts: 'For filming' };
+const ALIAS = { takes: 'footage', notes: 'files', kb: 'files' };
+const data = { scripts: null, recordings: null, footage: null, files: null };
+const failed = {};
+let tab = (() => {
+  const t = new URLSearchParams(location.search).get('tab');
+  const id = ALIAS[t] || t;
+  return TABS.some((x) => x[0] === id) ? id : 'recordings';
+})();
+
+function drawTabs() {
+  const bar = $('tabs');
+  bar.textContent = '';
+  TABS.forEach(([id, label]) => {
+    if (GROUPS[id]) bar.append(el('span', { class: 'eyebrow', 'aria-hidden': 'true', style: { alignSelf: 'center', padding: '0 8px 0 ' + (id === 'scripts' ? '18px' : '0') }, text: GROUPS[id] }));
+    const on = id === tab;
+    const n = data[id];
+    bar.append(el('button', {
+      type: 'button', role: 'tab', id: 'tab-' + id, class: 'subtab', 'aria-selected': String(on),
+      'aria-controls': 'panel-' + id, tabindex: on ? '0' : '-1', onclick: () => pick(id),
+    }, label, el('span', { class: 'quiet', text: Array.isArray(n) ? String(n.length) : '' })));
+  });
+  TABS.forEach(([id]) => { $('panel-' + id).hidden = id !== tab; });
+}
+
+function pick(id, focus) {
+  tab = id;
+  const url = new URL(location.href);
+  url.searchParams.set('tab', id);
+  history.replaceState(null, '', url);
+  drawTabs();
+  if (focus) $('tab-' + id).focus();
+}
+
+/* Arrow keys move between tabs, as a tablist should. */
+$('tabs').addEventListener('keydown', (e) => {
+  const i = TABS.findIndex((t) => t[0] === tab);
+  let j = null;
+  if (e.key === 'ArrowRight') j = (i + 1) % TABS.length;
+  else if (e.key === 'ArrowLeft') j = (i - 1 + TABS.length) % TABS.length;
+  else if (e.key === 'Home') j = 0;
+  else if (e.key === 'End') j = TABS.length - 1;
+  if (j == null) return;
+  e.preventDefault();
+  pick(TABS[j][0], true);
+});
+
+/* A list that couldn't load says so, with a way to try again. */
+function loadFailed(list, what, retry) {
+  list.textContent = '';
+  list.append(el('div', { class: 'row', style: { gap: '8px' } },
+    el('span', { class: 'bad-text', text: 'Couldn’t load the ' + what + '.' }),
+    el('button', { type: 'button', class: 'btn-q', onclick: retry }, 'Try again')));
+}
+function loading(list, what) {
+  list.textContent = '';
+  list.append(el('p', { class: 'pulse', style: { margin: 0 }, text: 'Loading ' + what + '…' }));
+}
+
+/* ==========================================================================
+   Scripts
+   ======================================================================== */
+
+/* id -> the full script once opened; id -> { n: text } for lines changed and
+   not yet saved, kept across redraws so a poll or a toggle never loses them. */
+const scriptFull = {};
+const drafts = {};
+const editing = new Set();
+let scriptConfirm = null;
+
+async function loadScripts() {
+  loading($('scripts-list'), 'scripts');
+  try {
+    const d = await A.api('/scripts/list');
+    data.scripts = Array.isArray(d.scripts) ? d.scripts : [];
+    failed.scripts = false;
+  } catch (err) {
+    failed.scripts = true;
+    loadFailed($('scripts-list'), 'scripts', loadScripts);
+    return;
+  }
+  drawTabs();
+  drawScripts();
+}
+
+async function fetchScript(id) {
+  if (scriptFull[id]) return scriptFull[id];
+  const d = await A.api('/scripts/read', { id });
+  scriptFull[id] = d.script;
+  return d.script;
+}
+
+/* How many lines the checks flagged, from whichever shape we have. */
+function flagCount(s) {
+  const full = scriptFull[s.id];
+  if (full && Array.isArray(full.flags)) return full.flags.length;
+  if (Array.isArray(s.flags)) return s.flags.length;
+  return Number(s.flagged || s.flag_count || 0);
+}
+
+function drawScripts() {
+  const list = $('scripts-list');
+  list.textContent = '';
+  const rows = data.scripts || [];
+  if (!rows.length) {
+    list.append(A.empty('Nothing written yet.', 'Write a script', './?start=film'));
+    return;
+  }
+  rows.forEach((s) => list.append(scriptCard(s)));
+}
+
+function scriptCard(s) {
+  const filmed = s.status === 'filmed';
+  const flags = flagCount(s);
+  const card = el('article', { class: 'card lib-card' },
+    el('div', { class: 'row', style: { gap: '10px' } },
+      el('h3', { class: 'name', text: s.topic || 'Untitled' }),
+      el('span', { class: 'tag' + (filmed ? ' ok' : ''), text: filmed ? 'Filmed' : 'Written' })),
+    el('span', { class: 'quiet', text: metaLine([
+      words(s.words),
+      s.lines ? A.plural(s.lines, 'line') : '',
+      'about ' + Math.max(1, Math.round((s.words || 0) / 2.6)) + 's',
+      day(s.created_at),
+      flags ? A.plural(flags, 'line') + ' to look at' : '',
+    ]) }),
+    s.hook ? el('span', { class: 'ink hook', text: '“' + s.hook + '”' }) : null);
+
+  if (scriptConfirm === s.id) {
+    card.append(A.confirmRow('Delete this script?', 'Delete', () => deleteScript(s), 'Keep', () => { scriptConfirm = null; drawScripts(); }, true));
+  } else {
+    const open = editing.has(s.id);
+    const film = './?start=film&script=' + encodeURIComponent(s.id);
+    card.append(el('div', { class: 'row lib-acts' },
+      el('a', { class: 'btn btn-p btn-sm', href: film }, filmed ? 'Upload another take' : 'Film this'),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', 'aria-expanded': String(open), 'aria-controls': 'lines-' + s.id,
+        onclick: () => { if (open) editing.delete(s.id); else editing.add(s.id); drawScripts(); } }, open ? 'Close' : 'Edit'),
+      el('button', { type: 'button', class: 'btn-q', onclick: (e) => copyScript(s, e.currentTarget) }, 'Copy'),
+      el('button', { type: 'button', class: 'btn-q', onclick: (e) => toggleFilmed(s, e.currentTarget) }, filmed ? 'Mark not filmed' : 'Mark filmed'),
+      el('button', { type: 'button', class: 'btn-q', onclick: () => { scriptConfirm = s.id; drawScripts(); } }, 'Delete')));
+  }
+  if (editing.has(s.id)) card.append(lineEditor(s));
+  return card;
+}
+
+async function copyScript(s, btn) {
+  btn.disabled = true;
+  try {
+    const full = await fetchScript(s.id);
+    await navigator.clipboard.writeText((full.lines || []).join('\n\n'));
+    A.toast('Script copied');
+  } catch (err) {
+    A.toast('Couldn’t copy it');
+  } finally { btn.disabled = false; }
+}
+
+async function toggleFilmed(s, btn) {
+  const next = s.status === 'filmed' ? 'written' : 'filmed';
+  btn.disabled = true;
+  try {
+    await A.api('/scripts/status', { id: s.id, status: next });
+    s.status = next;
+    drawScripts();
+  } catch (err) { A.toast(err.message); btn.disabled = false; }
+}
+
+async function deleteScript(s) {
+  try {
+    await A.api('/scripts/delete', { id: s.id });
+    data.scripts = data.scripts.filter((x) => x.id !== s.id);
+    delete drafts[s.id];
+    editing.delete(s.id);
+    scriptConfirm = null;
+    drawTabs();
+    drawScripts();
+    A.toast('Deleted');
+  } catch (err) { A.toast(err.message); }
+}
+
+/* The script itself: one box a line, because a line is the unit you rewrite.
+   Changed lines are marked; what the checks flagged sits under its line. */
+function lineEditor(s) {
+  const holder = el('div', { id: 'lines-' + s.id, class: 'stack', style: { gap: '8px' } },
+    el('p', { class: 'pulse', style: { margin: 0 }, text: 'Loading the script…' }));
+  fetchScript(s.id).then((full) => fillEditor(s, full, holder), () => {
+    holder.textContent = '';
+    holder.append(el('span', { class: 'bad-text', text: 'Couldn’t load that script.' }));
+  });
+  return holder;
+}
+
+function fillEditor(s, full, holder) {
+  holder.textContent = '';
+  const original = full.lines || [];
+  const flagsFor = (n) => ((full.flags || []).find((f) => Number(f.line) === n) || {}).issues || [];
+  const save = el('button', { type: 'button', class: 'btn btn-p btn-sm' }, 'Save and check again');
+  const syncSave = () => { save.disabled = !drafts[s.id]; };
+
+  const ol = el('ol', { class: 'lines' });
+  original.forEach((line, i) => {
+    const n = i + 1;
+    const d = drafts[s.id] || {};
+    const issues = flagsFor(n);
+    const box = el('textarea', { class: 'field' + (n in d ? ' changed' : '') + (issues.length ? ' flagged' : ''),
+      rows: '2', maxlength: '300', 'aria-label': 'Line ' + n });
+    box.value = n in d ? d[n] : line;
+    box.addEventListener('input', () => {
+      const all = drafts[s.id] || (drafts[s.id] = {});
+      if (tidy(box.value) === tidy(line)) delete all[n]; else all[n] = box.value;
+      if (!Object.keys(all).length) delete drafts[s.id];
+      box.classList.toggle('changed', !!drafts[s.id] && n in drafts[s.id]);
+      syncSave();
+    });
+    ol.append(el('li', {},
+      el('span', { class: 'n', 'aria-hidden': 'true', text: String(n) }),
+      el('div', { class: 'sline' }, box,
+        issues.map((why) => el('div', { class: 'flagbox', text: why })))));
+  });
+  holder.append(ol);
+
+  if (full.learned) {
+    holder.append(el('p', { class: 'quiet', style: { margin: 0 }, text: 'Someone new to property came away with: ' + full.learned }));
+  }
+
+  save.addEventListener('click', async () => {
+    const d = drafts[s.id] || {};
+    const lines = original.map((line, i) => (i + 1 in d ? tidy(d[i + 1]) : line));
+    save.disabled = true;
+    save.textContent = 'Checking…';
+    try {
+      const out = await A.api('/scripts/lines', { id: s.id, lines });
+      const outFlags = out.flags || [];
+      scriptFull[s.id] = Object.assign({}, full, { lines: out.lines || lines, words: out.words, flags: outFlags });
+      delete drafts[s.id];
+      s.words = out.words;
+      s.lines = (out.lines || lines).length;
+      drawScripts();
+      A.toast(outFlags.length ? 'Saved — some lines are flagged' : 'Saved');
+    } catch (err) {
+      A.toast(err.message);
+      save.textContent = 'Save and check again';
+      syncSave();
+    }
+  });
+  syncSave();
+  holder.append(el('div', { class: 'row' }, save));
+}
+
+/* ==========================================================================
+   Recordings
+   ======================================================================== */
+
+const REC_POLL_MS = 5000;
+const transcripts = {};      /* id -> text, once read */
+const showText = new Set();
+const players = {};          /* id -> the <audio> playing it, kept across redraws */
+let recConfirm = null;
+let renaming = null;         /* { id, draft } */
+let recPoll = null;
+
+async function loadRecordings(quiet) {
+  if (!quiet) loading($('recordings-list'), 'recordings');
+  try {
+    const d = await A.api('/recordings/list');
+    data.recordings = Array.isArray(d.recordings) ? d.recordings : [];
+    failed.recordings = false;
+  } catch (err) {
+    if (!quiet) { failed.recordings = true; loadFailed($('recordings-list'), 'recordings', () => loadRecordings()); }
+    return;
+  }
+  drawTabs();
+  drawRecordings();
+  pollRecordings();
+}
+
+/* While anything is still being transcribed, check back, and say when one
+   lands. Only redraw if something actually changed, so an open rename or a
+   playing recording isn't disturbed for nothing. */
+function pollRecordings() {
+  clearTimeout(recPoll);
+  if (!(data.recordings || []).some((r) => r.status === 'transcribing')) return;
+  recPoll = setTimeout(async () => {
+    const before = {};
+    (data.recordings || []).forEach((r) => { before[r.id] = r.status; });
+    try {
+      const d = await A.api('/recordings/list');
+      if (Array.isArray(d.recordings)) data.recordings = d.recordings;
+    } catch (e) { /* try again next time */ }
+    const now = data.recordings || [];
+    const changed = now.length !== Object.keys(before).length || now.some((r) => before[r.id] !== r.status);
+    if (changed) {
+      drawTabs();
+      drawRecordings();
+      if (now.some((r) => r.status === 'ready' && before[r.id] === 'transcribing')) A.toast('A recording finished transcribing');
+    }
+    pollRecordings();
+  }, REC_POLL_MS);
+}
+
+function drawRecordings() {
+  const list = $('recordings-list');
+  /* Keep focus in the rename box if a redraw happens while typing. */
+  const typing = renaming && document.activeElement && document.activeElement.id === 'rename-' + renaming.id;
+  list.textContent = '';
+  const rows = data.recordings || [];
+  if (!rows.length) {
+    list.append(A.empty('No recordings yet. Record something above, or upload one you already have.'));
+    return;
+  }
+  rows.forEach((r) => list.append(recCard(r)));
+  if (typing) { const box = $('rename-' + renaming.id); if (box) box.focus(); }
+}
+
+const REC_TAG = { ready: ['Transcribed', 'ok'], transcribing: ['Transcribing…', 'busy'], failed: ['Failed', 'bad'] };
+
+function recCard(r) {
+  const tag = REC_TAG[r.status] || [r.status || 'Unknown', ''];
+  const isRenaming = renaming && renaming.id === r.id;
+  const head = el('div', { class: 'row', style: { gap: '10px' } });
+  if (isRenaming) {
+    const box = el('input', { class: 'field inline-field', id: 'rename-' + r.id, maxlength: '120', 'aria-label': 'New name' });
+    box.value = renaming.draft;
+    box.addEventListener('input', () => { renaming.draft = box.value; });
+    box.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') { e.preventDefault(); saveName(r); }
+      if (e.key === 'Escape') { renaming = null; drawRecordings(); }
+    });
+    head.append(box,
+      el('button', { type: 'button', class: 'btn btn-p btn-sm', onclick: () => saveName(r) }, 'Save'),
+      el('button', { type: 'button', class: 'btn-q', onclick: () => { renaming = null; drawRecordings(); } }, 'Cancel'));
+    setTimeout(() => { if (document.activeElement === document.body) box.focus(); }, 0);
+  } else {
+    head.append(el('h3', { class: 'name', text: r.name || 'Untitled recording' }));
+  }
+  head.append(el('span', { class: 'tag ' + tag[1], text: tag[0] }));
+
+  const card = el('article', { class: 'card lib-card' }, head,
+    el('span', { class: 'quiet', text: metaLine([mins(r.seconds), words(r.words), day(r.created_at)]) }),
+    r.error ? el('span', { class: 'bad-text', text: r.error }) : null);
+
+  if (players[r.id]) card.append(players[r.id]);
+  if (showText.has(r.id)) {
+    card.append(el('div', { class: 'ink transcript', id: 'text-' + r.id,
+      text: r.id in transcripts ? transcripts[r.id] : 'Loading the transcript…' }));
+  }
+
+  if (recConfirm === r.id) {
+    card.append(A.confirmRow('Delete it? Its transcript leaves the library too.', 'Delete', () => deleteRecording(r), 'Keep', () => { recConfirm = null; drawRecordings(); }, true));
+  } else if (!isRenaming) {
+    const acts = el('div', { class: 'row lib-acts' });
+    if (r.status === 'ready') {
+      const open = showText.has(r.id);
+      acts.append(
+        el('a', { class: 'btn btn-p btn-sm', href: './?start=plan&recording=' + encodeURIComponent(r.id) }, 'Plan videos from this'),
+        el('button', { type: 'button', class: 'btn-q', 'aria-expanded': String(open), 'aria-controls': 'text-' + r.id,
+          onclick: () => toggleTranscript(r) }, open ? 'Hide transcript' : 'Show transcript'));
+    }
+    /* Older rows may not say; assume the audio is there unless told otherwise. */
+    if (r.has_audio !== false) {
+      acts.append(el('button', { type: 'button', class: 'btn-q', onclick: (e) => togglePlay(r, e.currentTarget) }, players[r.id] ? 'Stop' : 'Play'));
+    }
+    if (r.status === 'failed') {
+      acts.append(el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: (e) => retryRecording(r, e.currentTarget) }, 'Try again'));
+    }
+    acts.append(
+      el('button', { type: 'button', class: 'btn-q', onclick: () => { renaming = { id: r.id, draft: r.name || '' }; recConfirm = null; drawRecordings(); } }, 'Rename'),
+      el('button', { type: 'button', class: 'btn-q', onclick: () => { recConfirm = r.id; renaming = null; drawRecordings(); } }, 'Delete'));
+    card.append(acts);
+  }
+  return card;
+}
+
+async function toggleTranscript(r) {
+  if (showText.has(r.id)) { showText.delete(r.id); drawRecordings(); return; }
+  showText.add(r.id);
+  drawRecordings();
+  if (r.id in transcripts) return;
+  try {
+    const d = await A.api('/recordings/read', { id: r.id });
+    transcripts[r.id] = (d.recording && d.recording.transcript) || '(nothing was transcribed)';
+  } catch (err) {
+    /* Not cached, so opening it again tries again. */
+    const box = $('text-' + r.id);
+    if (box) box.textContent = err.message;
+    return;
+  }
+  const box = $('text-' + r.id);
+  if (box) box.textContent = transcripts[r.id];
+}
+
+/* The bucket is private, so the audio comes back through the Worker and is
+   played from a blob rather than a link. */
+async function togglePlay(r, btn) {
+  if (players[r.id]) { stopPlayer(r.id); drawRecordings(); return; }
+  btn.disabled = true;
+  btn.textContent = 'Loading…';
+  try {
+    const res = await window.AikoAuth.fetch(A.WORKER + '/recordings/audio', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ id: r.id }),
+    });
+    if (!res.ok) throw new Error('Couldn’t load that audio. Try again.');
+    const audio = el('audio', { controls: true, 'aria-label': 'Play ' + (r.name || 'recording') });
+    audio.src = URL.createObjectURL(await res.blob());
+    audio.addEventListener('ended', () => { stopPlayer(r.id); drawRecordings(); });
+    Object.keys(players).forEach(stopPlayer);   /* one at a time */
+    players[r.id] = audio;
+    drawRecordings();
+    audio.play().catch(() => {});
+  } catch (err) {
+    A.toast(err.message || 'Couldn’t load that audio. Try again.');
+    btn.disabled = false;
+    btn.textContent = 'Play';
+  }
+}
+function stopPlayer(id) {
+  const a = players[id];
+  if (!a) return;
+  a.pause();
+  URL.revokeObjectURL(a.src);
+  a.remove();
+  delete players[id];
+}
+
+async function retryRecording(r, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    await A.api('/recordings/retry', { id: r.id });
+    r.status = 'transcribing';
+    r.error = null;
+    A.toast('Transcribing again');
+    drawRecordings();
+    pollRecordings();
+  } catch (err) { A.toast(err.message); btn.disabled = false; btn.textContent = 'Try again'; }
+}
+
+async function saveName(r) {
+  const next = tidy(renaming ? renaming.draft : '');
+  if (!next) { A.toast('Give it a name.'); return; }
+  if (next === r.name) { renaming = null; drawRecordings(); return; }
+  try {
+    await A.api('/recordings/rename', { id: r.id, name: next });
+    r.name = next;
+    renaming = null;
+    drawRecordings();
+    A.toast('Renamed');
+  } catch (err) { A.toast(err.message); }
+}
+
+async function deleteRecording(r) {
+  try {
+    await A.api('/recordings/delete', { id: r.id });
+    stopPlayer(r.id);
+    data.recordings = data.recordings.filter((x) => x.id !== r.id);
+    recConfirm = null;
+    drawTabs();
+    drawRecordings();
+    A.toast('Deleted');
+  } catch (err) { A.toast(err.message); }
+}
+
+/* --- adding a recording ----------------------------------------------------
+
+   Two ways in, one destination: talk into the page, or hand it a file you
+   already have. Either way you hear it back and name it before it's saved.
+   The microphone is only asked for when Start is pressed and is released the
+   moment recording ends, so nothing sits on the mic in the background. */
+
+/* Whatever the browser will actually encode. Opus in WebM everywhere but
+   Safari, which gives mp4; both are audio the transcriber reads. */
+const TAKES = [
+  ['audio/webm;codecs=opus', 'audio/webm', 'webm'],
+  ['audio/webm', 'audio/webm', 'webm'],
+  ['audio/mp4', 'audio/mp4', 'm4a'],
+  ['audio/ogg;codecs=opus', 'audio/ogg', 'ogg'],
+];
+/* Stop before the Worker would refuse the upload, rather than after. */
+const SIZE_CAP = 38 * 1024 * 1024;
+const MINUTES_CAP = 90;
+const AUDIO_ACCEPT = 'audio/*,video/mp4,video/quicktime,video/webm';
+
+const rec = {
+  mode: 'off',          /* off | on | review | saving */
+  recorder: null, stream: null, chunks: [], bytes: 0, startedAt: 0, tick: null,
+  discarding: false,
+  file: null, seconds: 0, name: '', url: null,
+  preview: null,        /* the <audio> for playing it back */
+  say: '', bad: false,
+};
+
+function canRecord() {
+  if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia || !window.MediaRecorder) return null;
+  return TAKES.find(([mime]) => MediaRecorder.isTypeSupported(mime)) || null;
+}
+
+function noteName() {
+  const d = new Date();
+  return 'Voice note, ' + d.getDate() + ' ' + MON[d.getMonth()];
+}
+
+function say(text, bad) { rec.say = text || ''; rec.bad = !!bad; drawRecorder(); }
+
+const fileInput = el('input', { type: 'file', accept: AUDIO_ACCEPT, hidden: true, 'aria-label': 'Audio file' });
+fileInput.addEventListener('change', () => {
+  const file = fileInput.files[0];
+  fileInput.value = '';
+  if (!file) return;
+  if (file.size > 40 * 1024 * 1024) { say(file.name + ' is over 40MB. Trim it or upload a shorter one.', true); return; }
+  takeReady(file, 0, file.name.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 120));
+});
+
+function drawRecorder() {
+  const box = $('recorder');
+  /* Play/pause and the length arriving redraw this card; don't take the
+     cursor out of the name while that happens. */
+  const typing = document.activeElement && document.activeElement.id === 'rec-name';
+  const caret = typing ? document.activeElement.selectionStart : null;
+  box.textContent = '';
+  box.append(el('h2', { style: { fontSize: '16px' }, text: 'Add a recording' }), fileInput);
+
+  if (rec.mode === 'off') {
+    const take = canRecord();
+    box.append(el('div', { class: 'row' },
+      take ? el('button', { type: 'button', class: 'btn btn-p btn-sm', onclick: startRecording }, 'Start recording') : null,
+      take ? el('span', { class: 'quiet', text: 'or' }) : null,
+      el('button', { type: 'button', class: take ? 'btn btn-s btn-sm' : 'btn btn-p btn-sm', onclick: () => fileInput.click() }, 'Upload an audio file')));
+    box.append(el('span', { class: 'quiet', text: 'mp3, m4a, wav, webm, ogg or flac, up to 40MB. Recordings stop at 90 minutes. A ten-minute recording takes about half a minute to transcribe.' }));
+  } else if (rec.mode === 'on') {
+    box.append(el('div', { class: 'row' },
+      el('span', { class: 'rec-dot', 'aria-hidden': 'true' }),
+      el('span', { class: 'ink', style: { fontWeight: 600 }, id: 'rec-clock', role: 'timer', 'aria-live': 'off', text: 'Recording ' + A.clock((Date.now() - rec.startedAt) / 1000) }),
+      el('span', { class: 'grow' }),
+      el('button', { type: 'button', class: 'btn-q', onclick: discardTake }, 'Discard'),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: stopRecording }, 'Stop')));
+  } else {
+    /* review or saving */
+    const saving = rec.mode === 'saving';
+    const playing = rec.preview && !rec.preview.paused;
+    const name = el('input', { class: 'field inline-field', id: 'rec-name', maxlength: '120', required: true, disabled: saving });
+    name.value = rec.name;
+    const save = el('button', { type: 'button', class: 'btn btn-p btn-sm', disabled: saving || !tidy(rec.name), onclick: saveTake }, saving ? 'Saving…' : 'Save');
+    name.addEventListener('input', () => { rec.name = name.value; save.disabled = !tidy(rec.name); });
+    name.addEventListener('keydown', (e) => { if (e.key === 'Enter' && tidy(rec.name)) { e.preventDefault(); saveTake(); } });
+    box.append(el('div', { class: 'row' },
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', disabled: saving, onclick: togglePreview }, playing ? 'Pause' : 'Play it back'),
+      el('span', { class: 'quiet mono', text: rec.seconds ? A.clock(rec.seconds) : '' })));
+    box.append(el('div', { class: 'row', style: { gap: '8px' } },
+      el('label', { for: 'rec-name', class: 'ink', style: { fontSize: '14px', fontWeight: 600 }, text: 'Name it' }),
+      name,
+      el('button', { type: 'button', class: 'btn-q', disabled: saving, onclick: () => { discardTake(); say('Discarded.'); } }, 'Discard'),
+      save));
+  }
+  if (rec.say) box.append(el('p', { class: 'say' + (rec.bad ? ' bad' : ''), role: 'status', text: rec.say }));
+  const name = $('rec-name');
+  if (typing && name && !name.disabled) { name.focus(); name.setSelectionRange(caret, caret); }
+}
+
+function stopMic() {
+  if (rec.stream) rec.stream.getTracks().forEach((t) => t.stop());
+  rec.stream = null;
+}
+
+function clearTake() {
+  if (rec.preview) { rec.preview.pause(); rec.preview = null; }
+  if (rec.url) URL.revokeObjectURL(rec.url);
+  rec.url = null;
+  rec.file = null;
+  rec.seconds = 0;
+  rec.name = '';
+}
+
+function discardTake() {
+  if (rec.recorder && rec.recorder.state !== 'inactive') {
+    rec.discarding = true;
+    rec.recorder.stop();
+  }
+  rec.recorder = null;
+  clearInterval(rec.tick);
+  stopMic();
+  clearTake();
+  rec.mode = 'off';
+  rec.say = '';
+  drawRecorder();
+}
+
+async function startRecording() {
+  const take = canRecord();
+  if (!take) return;
+  clearTake();
+  rec.say = '';
+  try {
+    rec.stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+  } catch (err) {
+    const why = err && err.name === 'NotAllowedError'
+      ? 'The browser blocked the microphone. Allow it for this page, then try again.'
+      : err && err.name === 'NotFoundError'
+        ? 'No microphone was found. Plug one in, or upload a file instead.'
+        : 'Couldn’t open the microphone. Upload a file instead.';
+    say(why, true);
+    return;
+  }
+
+  const [mime, stored, ext] = take;
+  rec.chunks = [];
+  rec.bytes = 0;
+  rec.discarding = false;
+  /* 64kbps opus is more than speech needs and three times smaller than the
+     browser's default, which is what decides how long a take can run. */
+  const recorder = new MediaRecorder(rec.stream, { mimeType: mime, audioBitsPerSecond: 64000 });
+  rec.recorder = recorder;
+
+  recorder.addEventListener('dataavailable', (e) => {
+    if (!e.data || !e.data.size) return;
+    rec.chunks.push(e.data);
+    rec.bytes += e.data.size;
+    /* A run this long is a mistake, not a recording. Keep what was said. */
+    if (rec.bytes > SIZE_CAP || (Date.now() - rec.startedAt) / 60000 > MINUTES_CAP) {
+      rec.capped = true;
+      stopRecording();
+    }
+  });
+
+  recorder.addEventListener('stop', () => {
+    clearInterval(rec.tick);
+    stopMic();
+    if (rec.discarding) { rec.discarding = false; return; }
+    const seconds = Math.max(1, Math.round((Date.now() - rec.startedAt) / 1000));
+    const blob = new Blob(rec.chunks, { type: stored });
+    if (blob.size < 2000) {
+      rec.mode = 'off';
+      say('That was too short to transcribe. Record a little longer.', true);
+      return;
+    }
+    const capped = rec.capped;
+    rec.capped = false;
+    /* A plain type, without the codecs parameter: it is what names the file. */
+    takeReady(new File([blob], 'recording.' + ext, { type: stored }), seconds, noteName(),
+      capped ? 'That is as long as one recording can be, so it stopped there.' : '');
+  });
+
+  rec.startedAt = Date.now();
+  recorder.start(1000);
+  rec.mode = 'on';
+  drawRecorder();
+  rec.tick = setInterval(() => {
+    const c = $('rec-clock');
+    if (c) c.textContent = 'Recording ' + A.clock((Date.now() - rec.startedAt) / 1000);
+  }, 250);
+}
+
+function stopRecording() {
+  if (rec.recorder && rec.recorder.state !== 'inactive') rec.recorder.stop();
+  rec.recorder = null;
+}
+
+/* A finished take, recorded or picked: hear it back, name it, save it. */
+function takeReady(file, seconds, name, note) {
+  clearTake();
+  rec.file = file;
+  rec.seconds = seconds;
+  rec.name = name || noteName();
+  rec.url = URL.createObjectURL(file);
+  const audio = new Audio(rec.url);
+  audio.preload = 'metadata';
+  audio.addEventListener('loadedmetadata', () => {
+    if (!rec.seconds && Number.isFinite(audio.duration)) { rec.seconds = Math.round(audio.duration); drawRecorder(); }
+  });
+  audio.addEventListener('ended', drawRecorder);
+  audio.addEventListener('pause', drawRecorder);
+  audio.addEventListener('play', drawRecorder);
+  rec.preview = audio;
+  rec.mode = 'review';
+  rec.say = note || '';
+  rec.bad = !!note;
+  drawRecorder();
+  const box = $('rec-name');
+  if (box) box.focus();
+}
+
+function togglePreview() {
+  const a = rec.preview;
+  if (!a) return;
+  if (a.paused) a.play().catch(() => say('This browser can’t play that file back, but it can still be saved.', true));
+  else a.pause();
+}
+
+async function saveTake() {
+  const name = tidy(rec.name);
+  if (!rec.file) { say('Record something, or pick a file.', true); return; }
+  if (!name) { say('Give it a name.', true); return; }
+  if (rec.preview) rec.preview.pause();
+
+  const form = new FormData();
+  form.append('file', rec.file);
+  form.append('name', name);
+  rec.mode = 'saving';
+  rec.say = 'Uploading ' + (rec.file.size / 1024 / 1024).toFixed(1) + 'MB…';
+  rec.bad = false;
+  drawRecorder();
+  try {
+    let res;
+    try { res = await window.AikoAuth.fetch(A.WORKER + '/recordings', { method: 'POST', body: form }); }
+    catch (err) { if (err && err.auth) throw err; throw new Error('Couldn’t reach the server. Check your connection and try again.'); }
+    const d = await res.json().catch(() => ({}));
+    if (!res.ok) throw new Error(d.error || 'That didn’t work (' + res.status + '). Try again.');
+    clearTake();
+    rec.mode = 'off';
+    rec.say = '';
+    drawRecorder();
+    A.toast('Uploaded. Transcribing now…');
+    (data.recordings || (data.recordings = [])).unshift({
+      id: d.id, name: d.name || name, status: 'transcribing',
+      seconds: null, words: null, has_audio: true, created_at: new Date().toISOString(),
+    });
+    drawTabs();
+    drawRecordings();
+    pollRecordings();
+  } catch (err) {
+    rec.mode = 'review';
+    say(err.message, true);
+  }
+}
+
+/* Leaving mid-recording should not leave the mic open. */
+window.addEventListener('pagehide', () => { stopRecording(); stopMic(); });
+
+/* ==========================================================================
+   Footage
+   ======================================================================== */
+
+let footagePoll = null;
+let takeConfirm = null;
+
+async function loadFootage(quiet) {
+  if (!quiet) loading($('footage-list'), 'footage');
+  try {
+    const d = await A.api('/footage/list');
+    data.footage = Array.isArray(d.footage) ? d.footage : [];
+    failed.footage = false;
+  } catch (err) {
+    if (!quiet) { failed.footage = true; loadFailed($('footage-list'), 'footage', () => loadFootage()); }
+    else pollFootage();
+    return;
+  }
+  drawTabs();
+  drawFootage();
+  pollFootage();
+}
+
+/* A take moves on its own (waiting → transcribing → cut), so check back
+   while any is still on its way. */
+function pollFootage() {
+  clearTimeout(footagePoll);
+  if (!(data.footage || []).some((t) => t.status === 'uploaded' || t.status === 'transcribing')) return;
+  /* Don't redraw under an open delete question. */
+  footagePoll = setTimeout(() => { if (takeConfirm) pollFootage(); else loadFootage(true); }, 15000);
+}
+
+const clipCount = (t) => Number(t.clips || t.clip_count || 0);
+function takeTag(t) {
+  if (t.status === 'uploaded') return ['Waiting to be cut', 'busy'];
+  if (t.status === 'transcribing') return ['Transcribing…', 'busy'];
+  if (t.status === 'uploading') return ['Uploading', 'busy'];
+  if (t.status === 'ready') return [clipCount(t) ? 'Clips ready' : 'Transcribed', 'ok'];
+  if (t.status === 'failed') return ['Failed', 'bad'];
+  return [t.status || 'Unknown', ''];
+}
+
+function drawFootage() {
+  const list = $('footage-list');
+  list.textContent = '';
+  const rows = data.footage || [];
+  if (!rows.length) {
+    list.append(A.empty('No videos of you yet.', 'Upload a video of you', './?start=upload'));
+    return;
+  }
+  rows.forEach((t) => list.append(takeCard(t)));
+}
+
+function takeCard(t) {
+  const tag = takeTag(t);
+  const n = clipCount(t);
+  const card = el('article', { class: 'card lib-card' },
+    el('div', { class: 'row', style: { gap: '10px' } },
+      el('h3', { class: 'name', text: t.name || 'Untitled take' }),
+      el('span', { class: 'tag ' + tag[1], text: tag[0] })),
+    el('span', { class: 'quiet', text: metaLine([t.bytes ? gb(t.bytes) : '', mins(t.seconds), words(t.word_count), n ? A.plural(n, 'clip') : '']) }),
+    t.error ? el('span', { class: 'bad-text', id: 'why-' + t.id, text: t.error }) : null);
+
+  if (takeConfirm === t.id) {
+    card.append(A.confirmRow('Delete the take and its file? Clips already made stay.', 'Delete', () => deleteTake(t), 'Keep', () => { takeConfirm = null; drawFootage(); }, true));
+    return card;
+  }
+  const acts = el('div', { class: 'row lib-acts' });
+  if (t.status === 'ready') acts.append(el('a', { class: 'btn btn-s btn-sm', href: './videos.html?filter=review' }, 'See clips'));
+  /* The file is already in storage, so a take that fell over for a passing
+     reason is one button rather than another upload. */
+  if (t.status === 'failed') acts.append(el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: (e) => retryTake(t, e.currentTarget) }, 'Try again'));
+  acts.append(el('button', { type: 'button', class: 'btn-q', onclick: () => { takeConfirm = t.id; drawFootage(); } }, 'Delete'));
+  card.append(acts);
+  return card;
+}
+
+async function retryTake(t, btn) {
+  btn.disabled = true;
+  btn.textContent = 'Starting…';
+  try {
+    await A.api('/footage/retry', { id: t.id });
+    await loadFootage(true);
+  } catch (err) {
+    btn.disabled = false;
+    btn.textContent = 'Try again';
+    A.toast(err.message);
+  }
+}
+
+async function deleteTake(t) {
+  try {
+    await A.api('/footage/delete', { id: t.id });
+    data.footage = data.footage.filter((x) => x.id !== t.id);
+    takeConfirm = null;
+    drawTabs();
+    drawFootage();
+    A.toast('Deleted');
+  } catch (err) { A.toast(err.message); }
+}
+
+/* ==========================================================================
+   Files: what Aiko searches when it plans
+   ======================================================================== */
+
+const MAX_TEXT_CHARS = 100000;
+const TEXT_NAMES = /\.(txt|md|markdown|csv|tsv|json|vtt|srt)$/i;
+let fileConfirm = null;
+
+async function loadFiles() {
+  loading($('files-list'), 'files');
+  try {
+    const d = await A.api('/kb/list');
+    data.files = Array.isArray(d.files) ? d.files : [];
+    failed.files = false;
+  } catch (err) {
+    failed.files = true;
+    loadFailed($('files-list'), 'files', loadFiles);
+    return;
+  }
+  drawTabs();
+  drawFiles();
+}
+
+function fileKind(f) {
+  const url = f.source_url || '';
+  if (/youtube/i.test(f.document_type || '') || /(^|\/\/|\.)(youtube\.com|youtu\.be)\//i.test(url)) return 'YT';
+  if (url) return 'LINK';
+  return 'TXT';
+}
+const typeLabel = (t) => (t ? String(t).charAt(0).toUpperCase() + String(t).slice(1).replace(/_/g, ' ') : '');
+/* Statuses we can't be sure of are shown as they come; finished ones aren't. */
+const FILE_DONE = new Set(['ready', 'complete', 'completed', 'done', 'embedded', 'indexed', 'chunked', '']);
+function fileStatus(f) {
+  const s = String(f.status || '').toLowerCase();
+  if (FILE_DONE.has(s)) return null;
+  if (s === 'pending' || s === 'processing') return ['Getting it ready', 'busy'];
+  if (s === 'failed' || s === 'error') return ['Failed', 'bad'];
+  return [typeLabel(s), ''];
+}
+
+function drawFiles() {
+  const list = $('files-list');
+  list.textContent = '';
+  const rows = data.files || [];
+  if (!rows.length) {
+    list.append(A.empty('No notes or links yet.', 'Add notes for Aiko', () => $('kb-file').click()));
+    return;
+  }
+  rows.forEach((f) => list.append(fileRow(f)));
+}
+
+function fileRow(f) {
+  const title = f.title || 'Untitled file';
+  const st = fileStatus(f);
+  const row = el('article', { class: 'card row file-row' },
+    el('span', { class: 'kind', text: fileKind(f) }),
+    el('span', { class: 'ink name', style: { fontWeight: 600 } },
+      f.source_url ? el('a', { href: f.source_url, target: '_blank', rel: 'noopener noreferrer' }, title) : title),
+    f.document_type ? el('span', { class: 'tag', text: typeLabel(f.document_type) }) : null,
+    st ? el('span', { class: 'tag ' + st[1], text: st[0] }) : null,
+    el('span', { class: 'quiet', text: day(f.created_at) }));
+  /* It is gone from Aiko's searches for good, so ask first, in place. */
+  if (fileConfirm === f.id) {
+    row.append(A.confirmRow('Remove it? Aiko stops searching it.', 'Remove', () => removeFile(f), 'Keep', () => { fileConfirm = null; drawFiles(); }, true));
+  } else {
+    row.append(el('button', { type: 'button', class: 'btn-q', 'aria-label': 'Remove ' + title, onclick: () => { fileConfirm = f.id; drawFiles(); } }, 'Remove'));
+  }
+  return row;
+}
+
+async function removeFile(f) {
+  try {
+    await A.api('/kb/delete', { id: f.id });
+    data.files = data.files.filter((x) => x.id !== f.id);
+    fileConfirm = null;
+    drawTabs();
+    drawFiles();
+    A.toast('Removed');
+  } catch (err) { A.toast(err.message); }
+}
+
+function kbSay(text, bad) {
+  const p = $('kb-say');
+  p.textContent = text || '';
+  p.className = 'say' + (bad ? ' bad' : '');
+  p.hidden = !text;
+}
+
+function readText(file) {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onerror = () => reject(new Error('Couldn’t read ' + file.name + '.'));
+    reader.onload = () => resolve(String(reader.result));
+    reader.readAsText(file);
+  });
+}
+
+$('kb-add').addEventListener('click', () => $('kb-file').click());
+$('kb-file').addEventListener('change', async () => {
+  const input = $('kb-file');
+  const file = input.files[0];
+  input.value = '';
+  if (!file) return;
+  kbSay('');
+  /* Type sniffing is unreliable for text (Windows reports .md as nothing),
+     so go by the name, which is also what the Worker checks. */
+  if (!TEXT_NAMES.test(file.name)) { kbSay(file.name + ' isn’t a text file. Use .txt, .md, .csv, .tsv, .json, .vtt or .srt.', true); return; }
+  const btn = $('kb-add');
+  btn.disabled = true;
+  btn.textContent = 'Adding…';
+  try {
+    const text = await readText(file);
+    if (text.length > MAX_TEXT_CHARS) {
+      throw new Error(file.name + ' is ' + text.length.toLocaleString() + ' characters. The limit is ' + MAX_TEXT_CHARS.toLocaleString() + ', so split it up.');
+    }
+    kbSay('Adding ' + file.name + '…');
+    const out = await A.api('/kb/upload', { name: file.name, text, document_type: $('kb-type').value });
+    kbSay('');
+    A.toast(out.status === 'unchanged' ? (out.message || 'That file is already in the library.') : 'Added. Searchable in a few seconds.');
+    loadFiles();
+  } catch (err) {
+    kbSay(err.message, true);
+  } finally {
+    btn.disabled = false;
+    btn.textContent = 'Add a text file';
+  }
+});
+
+/* --- start ---------------------------------------------------------------- */
+
+drawTabs();
+drawRecorder();
+/* All four load at once so every tab's count is right from the start. */
+loadScripts();
+loadRecordings();
+loadFootage();
+loadFiles();
+</script>
+</body>
+</html>

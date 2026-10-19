@@ -1,0 +1,138 @@
+name: Knowledge base
+
+# Ingests source material into the kb schema and turns it into retrievable
+# chunks: files under kb/files/, plus article and YouTube URLs in
+# kb/sources.json.
+#
+# Daily at 14:00 UTC, an hour after the creator pull and two after the ad pull,
+# so the three jobs never race for the same push. This one writes nothing to
+# git — everything it produces lands in Postgres — so there is no push to race
+# over, but staggering keeps the API budgets from colliding.
+#
+# Every step skips itself, without failing, when its key is absent. The job
+# stays green on a fresh clone with no secrets wired up.
+
+on:
+  # Off until the AIKO sources replace Trilith's; restore to run on a timer.
+  # schedule:
+  #   - cron: '0 14 * * *'
+  workflow_dispatch:
+    inputs:
+      summarise:
+        description: 'Also rebuild document summaries and topic insights (costs Anthropic tokens)'
+        type: boolean
+        default: false
+      seed_hooks:
+        description: 'Also adapt Spyglass hook patterns into the hook library (costs Anthropic tokens)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+concurrency:
+  group: knowledge-base
+  cancel-in-progress: false
+
+jobs:
+  ingest:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Optional parsers. Without them a PDF or DOCX is reported as skipped
+      # with an actionable message instead of failing the run, so this step is
+      # allowed to fail rather than sink an otherwise good harvest.
+      - name: Install document parsers
+        continue-on-error: true
+        run: npm install --no-save pdf-parse mammoth
+
+      # Fast and idempotent: an unchanged document is recognised by its content
+      # hash and is not re-chunked or re-embedded. Safe to run every day.
+      - name: Ingest sources
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node tools/kb-ingest.mjs
+
+      # The expensive half — chunking and embedding. Separated from ingestion
+      # so a Voyage outage cannot lose the harvest: documents stay queued and
+      # the next run picks them up.
+      - name: Chunk and embed
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: node tools/kb-process.mjs
+
+      # Derives topic and angle for published pages that do not have them yet.
+      # Bounded per run by KB_MIRROR_LIMIT, so the first run does not read all
+      # 80 pages at once and every later run is nearly free.
+      - name: Mirror published content
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # The repo secret is named ANTHROPIC_API; the scripts read ANTHROPIC_API_KEY.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+          KB_MIRROR_LIMIT: '16'
+        run: node tools/kb-mirror-published.mjs
+
+      # The channel's own videos, so repetition detection sees what has been
+      # made and not only what is on the website. No model call: topic, angle
+      # and hook come straight from the planning slot.
+      - name: Mirror rendered videos
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: node tools/kb-mirror-videos.mjs
+
+      # Builds the hook library from adspy.hook_patterns. Off by default and a
+      # one-off in practice: it skips patterns already adapted, so a second run
+      # only picks up whatever the weekly Spyglass refresh added. Lives here
+      # rather than on a schedule because the credit cost is per pattern and the
+      # library does not need topping up nightly.
+      - name: Seed the hook library
+        if: inputs.seed_hooks
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # The repo secret is named ANTHROPIC_API; the scripts read ANTHROPIC_API_KEY.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+        run: node tools/kb-seed-hooks.mjs
+
+      # Hook search ranks by meaning, so a hook without a vector can only match
+      # on its topic. The seed embeds as it writes; this catches anything that
+      # came in without one. Reads only hooks missing a vector, so it is nearly
+      # free once the library is caught up.
+      - name: Embed hooks
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: node tools/kb-embed-hooks.mjs
+
+      # Phase 3. Off by default because it reads every chunk of every new
+      # document through the model, which is the most expensive thing here and
+      # the least urgent — the chunks are already retrievable without it.
+      - name: Summarise documents
+        if: inputs.summarise
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          # The repo secret is named ANTHROPIC_API; the scripts read ANTHROPIC_API_KEY.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+          VOYAGE_API_KEY: ${{ secrets.VOYAGE_API_KEY }}
+        run: node tools/kb-summarise.mjs

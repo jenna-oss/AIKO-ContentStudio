@@ -1,0 +1,99 @@
+name = "aiko-studio"
+main = "src/index.js"
+compatibility_date = "2026-08-01"
+
+# Needed so the Anthropic SDK's Node built-in imports resolve inside Workers.
+compatibility_flags = ["nodejs_compat"]
+
+# Not a secret: this URL ships in every Supabase client app.
+[vars]
+# Set to the AIKO Content Studio project, never Trilith's shared one.
+SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co"
+# Where /videos/edit starts render-videos.yml.
+GITHUB_REPO = "jenna-oss/AIKO-ContentStudio"
+
+# Every five minutes, for anything scheduled to go to Instagram or Facebook.
+# Neither holds a post for us, so this is the waiting. A run that finds nothing
+# due does nothing and costs nothing.
+[triggers]
+crons = ["*/5 * * * *"]
+
+# Keys are NOT set here. Secrets in a committed file would be public.
+# Set them once, from your terminal, and they stay encrypted on Cloudflare:
+#
+#   npx wrangler secret put ANTHROPIC_API_KEY
+#   npx wrangler secret put SUPABASE_ANON_KEY
+#   npx wrangler secret put VOYAGE_API_KEY
+#   npx wrangler secret put GITHUB_TOKEN
+#   npx wrangler secret put ELEVENLABS_API_KEY
+#   npx wrangler secret put SUPADATA_API_KEY
+#   npx wrangler secret put UPLOAD_POST_API_KEY
+#   npx wrangler secret put META_APP_ID
+#   npx wrangler secret put META_APP_SECRET
+#   npx wrangler secret put META_TOKEN_KEY
+#   npx wrangler secret put META_LOGIN_CONFIG_ID   (optional)
+#
+# UPLOAD_POST_API_KEY is how posts reach Instagram, Facebook, YouTube and
+# TikTok: Upload-Post runs apps those platforms have already approved, so there
+# is no YouTube or TikTok audit to pass. The Schedule page's Connect button
+# opens Upload-Post's page, where each account is signed in to on its own site.
+# UPLOAD_POST_PROFILE (a var, optional) names the profile; it defaults to
+# thebuybox and is made the first time it is needed.
+#
+# The Meta keys below are the fallback, used only when UPLOAD_POST_API_KEY is
+# not set. They are what lets the Schedule page publish to the Facebook Page and
+# the Instagram account linked to it. The app id and secret come from a Business
+# app at developers.facebook.com, owned by the Trilith Funding Business
+# Portfolio, with Facebook Login for Business added and this Worker's
+# /meta/callback registered as a Valid OAuth Redirect URI. There is no password
+# here: whoever connects signs in as themselves on Facebook and picks the Page.
+# META_LOGIN_CONFIG_ID is the Login for Business configuration (user access
+# token); without it the Worker asks for the permissions by name instead.
+#
+# META_TOKEN_KEY is 32 random bytes, base64, and it is ours, not Meta's.
+# The Page tokens are encrypted with it before they are stored, because this
+# Supabase project is shared with other AIKO tools and anything holding its
+# anon key can read the row. Make one with:
+#
+#   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
+#
+# Keep it. Changing it makes the stored tokens unreadable and the Page has to be
+# connected again.
+#
+# ELEVENLABS_API_KEY transcribes what is uploaded or recorded on the Recordings
+# page. Without it /recordings returns 503 and says so.
+#
+# SUPADATA_API_KEY gets the words out of a YouTube link pasted on the Plan page.
+# YouTube stopped serving caption tracks to anything but its own player during
+# 2026 — the signed track URL answers 200 with an empty body — so there is no
+# free route left. Without this key a video still reads, but only down to its
+# title, channel and description, and it is flagged as partial so the planner
+# never mistakes a description for what was said.
+#
+# GITHUB_TOKEN lets /videos/edit start an edit in GitHub Actions. Make it a
+# fine-grained personal access token limited to this one repository, with the
+# single permission Actions: Read and write. Without it, edit requests return
+# 503 and nothing else changes.
+#
+# Every route needs a Clerk session whose email is in kb.app_users (see
+# src/auth.js). The origin allowlist in index.js stops browsers and nothing
+# else, so sign-in is the lock. CLERK_SECRET_KEY (sk_live_... or sk_test_...,
+# from the Clerk dashboard under API keys) lets the Worker check those sessions:
+#
+#   npx wrangler secret put CLERK_SECRET_KEY
+#
+# Without it every route answers 502. The matching publishable key (pk_...) is
+# not a secret and lives in assets/clerk.js.
+#
+# VOYAGE_API_KEY is optional. Without it the knowledge-base tools still answer,
+# using keyword search alone, and every result they return is marked degraded so
+# the model says the search was partial rather than concluding nothing exists.
+#
+# Each prompts for the value — never typed into a file or a chat window.
+#
+# SUPABASE_ANON_KEY must be the anon/publishable key, never the service role
+# key. Anon is read-only against both corpora by RLS; the service role key
+# bypasses RLS entirely and would let this endpoint rewrite them.
+
+[observability]
+enabled = true

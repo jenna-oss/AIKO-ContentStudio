@@ -1,0 +1,1066 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Schedule — Content studio</title>
+<script src="./assets/theme.js"></script>
+<script src="./assets/auth.js"></script>
+<link rel="stylesheet" href="./assets/app.css">
+<style>
+  /* Status colours. Each one also has words (the tag), a mark (! or ✓) or a
+     dashed edge, so colour is never the only thing saying it. */
+  .ent.s-scheduled { background:var(--emerald); color:#fff; }
+  .ent.s-working { background:var(--warn-bg); color:var(--warn-ink); outline:1px dashed var(--warn-ink); outline-offset:-1px; }
+  .ent.s-posted { background:var(--strong); color:var(--ink); }
+  .ent.s-failed { background:var(--clay); color:var(--chip-on-ink); }
+  .swatch { width:12px; height:12px; border-radius:2px; padding:0; display:inline-block; flex-shrink:0; }
+
+  .pcard { padding:12px 16px; display:flex; gap:14px; align-items:flex-start; flex-wrap:wrap; border-left-width:3px; }
+  .pcard.s-scheduled { border-left-color:var(--emerald); }
+  .pcard.s-working { border-left-color:var(--ochre-fill); border-left-style:dashed; }
+  .pcard.s-posted { border-left-color:var(--strong); }
+  .pcard.s-failed { border-left-color:var(--clay); }
+  .pcard.s-cancelled { border-left-color:var(--rule); }
+  .pcard .body { flex:1 1 260px; display:flex; flex-direction:column; gap:4px; min-width:0; overflow-wrap:anywhere; }
+  .pthumb { width:30px; height:54px; border-radius:3px; object-fit:cover; background:var(--sunk); flex-shrink:0; display:block; }
+
+  .picks { max-height:320px; overflow-y:auto; display:flex; flex-direction:column; gap:6px; padding:2px; }
+  .pick { padding:8px 12px; text-align:left; color:inherit; gap:12px; flex-wrap:nowrap; width:100%; }
+  .pick:hover { border-color:var(--emerald); }
+  .pick[aria-pressed="true"] { border-color:var(--emerald); box-shadow:inset 0 0 0 1px var(--emerald); }
+  .pick .pthumb { width:26px; height:46px; }
+  .lbl { color:var(--ink); font-weight:600; }
+  .count { font-family:var(--mono); }
+  .see { display:inline-flex; align-items:center; min-height:44px; padding:0 10px; font-size:14px; text-decoration:none; }
+</style>
+</head>
+<body>
+
+<main class="page">
+  <div id="next"></div>
+
+  <div class="row" style="justify-content: space-between">
+    <h1>Schedule</h1>
+    <div class="row" style="gap: 6px">
+      <div role="group" aria-label="Show as" class="row" style="gap: 4px">
+        <button type="button" class="chip chip-sm" id="view-month" aria-pressed="true">Month</button>
+        <button type="button" class="chip chip-sm" id="view-list" aria-pressed="false">List</button>
+      </div>
+      <button type="button" class="btn btn-s btn-sm" id="open-accounts">Social accounts</button>
+    </div>
+  </div>
+
+  <div id="notices" class="stack" hidden></div>
+  <div id="state" class="row"><span class="quiet">Loading the schedule…</span></div>
+
+  <section id="month" class="stack" aria-label="Calendar" hidden>
+    <div class="row" style="justify-content: space-between">
+      <div class="row" style="gap: 4px">
+        <button type="button" class="btn-q" id="cal-prev" aria-label="Previous month" style="font-size: 20px">‹</button>
+        <h2 id="cal-month" aria-live="polite" style="min-width: 150px; text-align: center"></h2>
+        <button type="button" class="btn-q" id="cal-next" aria-label="Next month" style="font-size: 20px">›</button>
+      </div>
+      <button type="button" class="btn btn-s btn-sm" id="cal-today">Today</button>
+    </div>
+    <div class="cal" id="cal-dow" aria-hidden="true"></div>
+    <div class="cal" id="cal-grid"></div>
+    <div class="row quiet" id="legend" style="gap: 14px; font-size: 12px"></div>
+    <div class="row" style="justify-content: space-between; border-top: 1px solid var(--rule); padding-top: 14px">
+      <h2 id="day-title"></h2>
+      <span id="day-action"></span>
+    </div>
+  </section>
+
+  <section id="posts" class="stack" style="gap: 10px" aria-label="Posts" hidden></section>
+</main>
+
+<!-- Social accounts -->
+<div class="scrim" id="acct-scrim" hidden>
+  <div class="side" role="dialog" aria-modal="true" aria-labelledby="acct-title" style="width: min(480px, 100%)">
+    <div class="side-head">
+      <h2 id="acct-title">Social accounts</h2>
+      <button type="button" class="icon-btn" aria-label="Close" data-close style="font-size: 22px">×</button>
+    </div>
+    <div class="side-body" id="acct-body"></div>
+  </div>
+</div>
+
+<!-- Scheduling a video, or changing a post -->
+<div class="scrim" id="sched-scrim" hidden>
+  <div class="side" role="dialog" aria-modal="true" aria-labelledby="sched-title">
+    <div class="side-head">
+      <h2 id="sched-title">Schedule a video</h2>
+      <button type="button" class="icon-btn" aria-label="Close" data-close style="font-size: 22px">×</button>
+    </div>
+    <div class="side-body" id="sched-body"></div>
+  </div>
+</div>
+
+<script src="./assets/shell.js"></script>
+<script>
+/* Where posts go out from: a month calendar (or a plain list) of what is
+   scheduled, sending, posted or failed; a drawer for scheduling an approved
+   video; and a drawer for the accounts it posts to.
+
+   Accounts come from Upload-Post when the Worker has its key (all four
+   platforms). Without it, the direct Meta connection is the fallback
+   (Facebook, and the Instagram account linked to the Page). */
+const A = AikoApp;
+const el = A.el;
+A.header('schedule');
+
+const NAMES = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok' };
+const MARKS = { instagram: 'IG', facebook: 'FB', youtube: 'YT', tiktok: 'TT' };
+const PLATFORMS = Object.keys(NAMES);
+const STATUS = {
+  scheduled: ['Scheduled', 'tag ok'], working: ['Sending…', 'tag busy'], posted: ['Posted', 'tag'],
+  failed: ['Failed', 'tag bad'], cancelled: ['Cancelled', 'tag'],
+};
+/* What a group of posts shows as on the calendar: the state most worth a look. */
+const RANK = ['failed', 'working', 'scheduled', 'posted'];
+const IMAGES_NOTE = 'Images and carousels aren’t available yet; reels and shorts are.';
+
+const $ = (id) => document.getElementById(id);
+const params = new URLSearchParams(location.search);
+
+/* Days are the viewer's own, not UTC: a 9pm post belongs to tonight. */
+const dayKey = (d) => {
+  const t = new Date(d);
+  return `${t.getFullYear()}-${String(t.getMonth() + 1).padStart(2, '0')}-${String(t.getDate()).padStart(2, '0')}`;
+};
+const fromKey = (k) => { const [y, m, d] = k.split('-').map(Number); return new Date(y, m - 1, d); };
+const todayKey = () => dayKey(new Date());
+const timeOf = (d) => `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+const nameOf = (k) => NAMES[k] || k;
+
+let view = 'month';
+try { view = localStorage.getItem('schedule-view') === 'list' ? 'list' : 'month'; } catch (e) { /* private mode */ }
+if (params.get('view') === 'list') view = 'list';
+
+let videos = [];
+let posts = [];
+let calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+let selectedDay = todayKey();
+let confirmPost = null;      // { key, kind: 'send' | 'cancel' } — the card asking a question
+let refocusKey = null;       // the data-k of what should have focus after a redraw
+let pollTimer = null;
+let loaded = false;        // nothing is drawn until the posts have come back once
+
+/* --- the posts ------------------------------------------------------------- */
+
+async function loadData(fresh) {
+  let s;
+  try { s = await A.status(fresh); }
+  catch (err) {
+    const st = $('state');
+    st.hidden = false;
+    st.textContent = '';
+    st.append(el('span', { class: 'bad-text', text: 'Couldn’t load the schedule. ' + err.message }),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: () => loadData(true) }, 'Try again'));
+    return;
+  }
+  videos = s.videos || [];
+  posts = s.posts || [];
+  loaded = true;
+  $('state').hidden = true;
+  draw();
+  A.nextUp($('next'), { failed: false });
+  schedulePoll();
+}
+
+/* Only while something is mid-flight: a post sending, or one whose time has
+   just come and the publisher hasn't picked up yet. Not forever. */
+function schedulePoll() {
+  clearTimeout(pollTimer);
+  const now = Date.now();
+  const busy = posts.some((p) => p.status === 'working'
+    || (p.status === 'scheduled' && new Date(p.scheduled_for) <= now && now - new Date(p.scheduled_for) < 15 * 60000));
+  if (busy) pollTimer = setTimeout(() => loadData(true), 20000);
+}
+
+const mediaUrl = (p) => (p.media && p.media[0] && p.media[0].url) || '';
+function videoFor(p) { return videos.find((v) => A.postsFor(v, [p]).length) || null; }
+
+/* The same video at the same time to several platforms is one entry, on the
+   calendar (any status) and as a card (same status, so its actions fit all). */
+function groupBy(list, withStatus) {
+  const groups = new Map();
+  for (const p of list) {
+    const k = [p.scheduled_for, p.caption || '', p.render_id || mediaUrl(p), withStatus ? p.status : ''].join('|');
+    if (!groups.has(k)) groups.set(k, []);
+    groups.get(k).push(p);
+  }
+  return [...groups.entries()]
+    .map(([key, g]) => ({ key, posts: g }))
+    .sort((a, b) => new Date(a.posts[0].scheduled_for) - new Date(b.posts[0].scheduled_for));
+}
+const live = () => posts.filter((p) => p.status !== 'cancelled');
+const rankOf = (g) => RANK.find((r) => g.some((p) => p.status === r)) || 'scheduled';
+
+/* --- month or list ---------------------------------------------------------- */
+
+function setView(next) {
+  view = next;
+  try { localStorage.setItem('schedule-view', next); } catch (e) { /* private mode */ }
+  confirmPost = null;
+  draw();
+}
+$('view-month').addEventListener('click', () => setView('month'));
+$('view-list').addEventListener('click', () => setView('list'));
+$('cal-prev').addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() - 1, 1); drawCalendar(); });
+$('cal-next').addEventListener('click', () => { calMonth = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 1); drawCalendar(); });
+$('cal-today').addEventListener('click', () => {
+  calMonth = new Date(new Date().getFullYear(), new Date().getMonth(), 1);
+  selectDay(todayKey());
+});
+
+function draw() {
+  $('view-month').setAttribute('aria-pressed', String(view === 'month'));
+  $('view-list').setAttribute('aria-pressed', String(view === 'list'));
+  if (!loaded) return;
+  $('month').hidden = view !== 'month';
+  $('posts').hidden = false;
+  if (view === 'month') drawCalendar();
+  else drawPosts();
+}
+
+function selectDay(key) {
+  selectedDay = key;
+  const d = fromKey(key);
+  if (d.getMonth() !== calMonth.getMonth() || d.getFullYear() !== calMonth.getFullYear()) calMonth = new Date(d.getFullYear(), d.getMonth(), 1);
+  confirmPost = null;
+  refocusKey = 'day:' + key;
+  drawCalendar();
+}
+
+function drawCalendar() {
+  $('cal-month').textContent = calMonth.toLocaleDateString(undefined, { month: 'long', year: 'numeric' });
+
+  /* Weeks start on Sunday, as a US wall calendar does. */
+  const first = new Date(calMonth.getFullYear(), calMonth.getMonth(), 1);
+  const start = new Date(first.getFullYear(), first.getMonth(), 1 - first.getDay());
+  const dow = $('cal-dow');
+  dow.textContent = '';
+  for (let i = 0; i < 7; i += 1) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    dow.append(el('span', { class: 'quiet', style: { textAlign: 'center', fontWeight: 600 }, text: d.toLocaleDateString(undefined, { weekday: 'short' }) }));
+  }
+
+  const grid = $('cal-grid');
+  const keepFocus = document.activeElement && grid.contains(document.activeElement) ? document.activeElement.dataset.k : null;
+  grid.textContent = '';
+  const today = todayKey();
+  const last = new Date(calMonth.getFullYear(), calMonth.getMonth() + 1, 0);
+  const cells = Math.ceil((first.getDay() + last.getDate()) / 7) * 7;
+  const all = live();
+  for (let i = 0; i < cells; i += 1) {
+    const d = new Date(start.getFullYear(), start.getMonth(), start.getDate() + i);
+    const key = dayKey(d);
+    const day = all.filter((p) => dayKey(p.scheduled_for) === key);
+    const groups = groupBy(day, false);
+    const other = d.getMonth() !== calMonth.getMonth();
+    const failed = day.filter((p) => p.status === 'failed').length;
+
+    const cell = el('button', {
+      type: 'button',
+      class: 'day' + (other ? ' other' : '') + (key < today && !other ? ' past' : '') + (key === today ? ' today' : ''),
+      'aria-pressed': String(key === selectedDay),
+      'aria-label': A.fmtDay(d) + ', ' + A.plural(day.length, 'post') + (failed ? ', ' + failed + ' failed' : ''),
+      'data-k': 'day:' + key,
+      onclick: () => selectDay(key),
+    }, el('span', { style: { fontSize: '12px', fontWeight: 600 }, text: String(d.getDate()) }));
+
+    for (const g of groups.slice(0, 3)) {
+      const state = rankOf(g.posts);
+      const when = A.fmtTime(g.posts[0].scheduled_for);
+      cell.append(el('span', { class: 'ent s-' + state, title: when + ' · ' + A.joinNames(g.posts.map((p) => nameOf(p.platform))) + ' · ' + STATUS[state][0] },
+        el('span', { class: 't', text: when.replace(':00', '') + ' ' }),
+        (state === 'failed' ? '! ' : state === 'posted' ? '✓ ' : '') + g.posts.map((p) => MARKS[p.platform] || '?').join(' ')));
+    }
+    if (groups.length > 3) cell.append(el('span', { class: 'quiet', style: { fontSize: '11px' }, text: '+' + (groups.length - 3) + ' more' }));
+    grid.append(cell);
+  }
+
+  const legend = $('legend');
+  if (!legend.childElementCount) {
+    for (const k of ['scheduled', 'working', 'posted', 'failed']) {
+      legend.append(el('span', { class: 'row', style: { gap: '6px' } },
+        el('span', { class: 'swatch ent s-' + k, 'aria-hidden': 'true' }), STATUS[k][0].replace('…', '')));
+    }
+  }
+
+  const title = A.fmtDay(fromKey(selectedDay));
+  $('day-title').textContent = title;
+  const act = $('day-action');
+  act.textContent = '';
+  /* A day still to come can be scheduled straight from here. */
+  if (selectedDay >= today) {
+    act.append(el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: () => openSchedule({ day: selectedDay }) }, 'Schedule a video on ' + title));
+  }
+
+  const want = refocusKey || keepFocus;
+  if (want && want.startsWith('day:')) { const b = grid.querySelector(`[data-k="${want}"]`); if (b) b.focus(); refocusKey = null; }
+  drawPosts();
+}
+
+/* The chosen day's posts (month) or every post (list), as cards. */
+function drawPosts() {
+  const box = $('posts');
+  const keepFocus = document.activeElement && box.contains(document.activeElement) ? document.activeElement.dataset.k : null;
+  box.textContent = '';
+  const list = view === 'month'
+    ? live().filter((p) => dayKey(p.scheduled_for) === selectedDay)
+    : posts.slice();
+  const groups = groupBy(list, true);
+
+  if (!groups.length) {
+    if (view === 'month') box.append(el('p', { class: 'quiet', style: { margin: 0 }, text: 'Nothing goes out this day.' }));
+    else box.append(A.empty('Nothing scheduled yet.', 'See approved videos', './videos.html?filter=approved'));
+  }
+  for (const g of groups) box.append(postCard(g));
+
+  const want = refocusKey || keepFocus;
+  refocusKey = null;
+  if (want && !want.startsWith('day:')) { const b = box.querySelector(`[data-k="${CSS.escape(want)}"]`); if (b) b.focus(); }
+}
+
+function postCard(g) {
+  const ps = g.posts;
+  const p0 = ps[0];
+  const v = videoFor(p0);
+  const status = p0.status;
+  const names = A.joinNames(ps.map((p) => nameOf(p.platform)));
+  const src = (v && v.url) || mediaUrl(p0);
+  const cap = p0.caption || '';
+  const title = v ? (v.topic || 'Untitled') : (cap ? (cap.length > 60 ? cap.slice(0, 60) + '…' : cap) : 'Untitled post');
+  const k = g.key;
+
+  const thumb = src
+    ? el('video', { class: 'pthumb', src: src.split('#')[0] + '#t=1', preload: 'metadata', muted: true, playsinline: true, 'aria-hidden': 'true' })
+    : el('span', { class: 'pthumb', 'aria-hidden': 'true' });
+
+  const body = el('div', { class: 'body' },
+    el('div', { class: 'row', style: { gap: '8px' } },
+      el('span', { class: 'ink', style: { fontWeight: 600 }, text: title }),
+      el('span', { class: (STATUS[status] || ['', 'tag'])[1], text: (STATUS[status] || [status])[0] })),
+    el('span', { class: 'quiet', text: A.fmtWhen(p0.scheduled_for) + ' · ' + names }),
+    cap ? el('span', { style: { fontSize: '13px' }, text: cap.length > 140 ? cap.slice(0, 140) + '…' : cap }) : null);
+
+  /* Each platform keeps its own error; name it when there is more than one. */
+  if (status !== 'posted') {
+    const errs = ps.filter((p) => p.error);
+    const distinct = new Set(errs.map((p) => p.error));
+    if (distinct.size === 1 && errs.length === ps.length) body.append(el('span', { class: 'bad-text', text: errs[0].error }));
+    else for (const p of errs) body.append(el('span', { class: 'bad-text', text: nameOf(p.platform) + ': ' + p.error }));
+  }
+
+  const canAct = status === 'scheduled' || status === 'failed';
+  if (canAct && confirmPost && confirmPost.key === k) {
+    const send = confirmPost.kind === 'send';
+    const row = A.confirmRow(
+      send ? 'Post it now to ' + names + '? This can’t be undone.' : 'Cancel this post? It won’t go out.',
+      send ? 'Post now' : 'Cancel post',
+      (e) => (send ? sendNow(ps, e.currentTarget) : cancelPosts(ps, e.currentTarget)),
+      send ? 'Not yet' : 'Keep it',
+      () => { confirmPost = null; refocusKey = k + (send ? ':send' : ':cancel'); drawPosts(); },
+      !send);
+    const btns = row.querySelectorAll('button');
+    btns[0].dataset.k = k + ':yes';
+    btns[1].dataset.k = k + ':no';
+    body.append(row);
+  } else {
+    const acts = el('div', { class: 'row', style: { gap: '4px' } });
+    if (canAct) {
+      acts.append(
+        el('button', { type: 'button', class: 'btn btn-s btn-sm', 'data-k': k + ':send', onclick: () => ask(k, 'send') }, status === 'failed' ? 'Try again now' : 'Post now'),
+        el('button', { type: 'button', class: 'btn-q', 'data-k': k + ':edit', onclick: () => openSchedule({ group: ps }) }, 'Change time or caption'),
+        el('button', { type: 'button', class: 'btn-q', 'data-k': k + ':cancel', onclick: () => ask(k, 'cancel') }, 'Cancel post'));
+    }
+    if (status === 'posted') {
+      for (const p of ps.filter((x) => x.permalink)) {
+        acts.append(el('a', { class: 'link see', href: p.permalink, target: '_blank', rel: 'noopener' }, 'See it on ' + nameOf(p.platform) + ' ↗'));
+      }
+    }
+    if (acts.childElementCount) body.append(acts);
+  }
+
+  return el('div', { class: 'card pcard s-' + status }, thumb, body);
+}
+
+function ask(key, kind) {
+  confirmPost = { key, kind };
+  refocusKey = key + ':no';   // the safe answer, not the irreversible one
+  drawPosts();
+}
+
+function busyRow(btn, text) {
+  const row = btn.parentNode;
+  row.querySelectorAll('button').forEach((b) => { b.disabled = true; });
+  btn.textContent = text;
+}
+
+async function sendNow(ps, btn) {
+  busyRow(btn, 'Posting…');
+  try {
+    await Promise.all(ps.map((p) => A.api('/posts/now', { id: p.id })));
+    toast('Sending now. It usually shows up within a few minutes.');
+  } catch (err) {
+    toast(err.message);
+  }
+  confirmPost = null;
+  await loadData(true);
+}
+
+async function cancelPosts(ps, btn) {
+  busyRow(btn, 'Cancelling…');
+  try {
+    await Promise.all(ps.map((p) => A.api('/posts/cancel', { id: p.id })));
+  } catch (err) {
+    toast(err.message);
+    confirmPost = null;
+    await loadData(true);
+    return;
+  }
+  confirmPost = null;
+  await loadData(true);
+  /* Only say the video is back under Approved when nothing else of it is still going out. */
+  const v = videoFor(ps[0]);
+  const still = v && A.postsFor(v, posts).some((p) => p.status === 'scheduled' || p.status === 'working' || p.status === 'posted');
+  toast(v && !still ? 'Post cancelled. The video is back under Approved.' : 'Post cancelled.');
+}
+
+const toast = (text, undo) => A.toast(text, undo);
+
+/* --- drawers -------------------------------------------------------------------
+
+   Two right-side drawers; only one is open at a time. Escape or the scrim
+   closes it, focus moves in on open and goes back where it was on close. */
+
+const drawers = { acct: $('acct-scrim'), sched: $('sched-scrim') };
+let lastFocus = null;
+
+function openDrawer(name) {
+  /* Swapping one drawer for the other keeps where focus goes back to. */
+  if (!openName()) lastFocus = document.activeElement;
+  Object.keys(drawers).forEach((n) => { if (n !== name && !drawers[n].hidden) closeDrawer(n, true); });
+  const scrim = drawers[name];
+  scrim.hidden = false;
+  document.body.style.overflow = 'hidden';
+  setTimeout(() => {
+    const first = scrim.querySelector('.side-body button:not(:disabled), .side-body input, .side-body select, .side-body textarea, .side-body a[href]');
+    (first || scrim.querySelector('[data-close]')).focus();
+  }, 30);
+}
+function closeDrawer(name, swapping) {
+  const scrim = drawers[name];
+  if (scrim.hidden) return;
+  scrim.hidden = true;
+  if (name === 'acct' && location.hash === '#accounts') history.replaceState(null, '', location.pathname + location.search);
+  if (swapping) return;
+  document.body.style.overflow = '';
+  if (lastFocus && document.contains(lastFocus)) lastFocus.focus();
+}
+const openName = () => Object.keys(drawers).find((n) => !drawers[n].hidden);
+
+Object.keys(drawers).forEach((name) => {
+  const scrim = drawers[name];
+  scrim.addEventListener('click', (e) => { if (e.target === scrim) closeDrawer(name); });
+  scrim.querySelector('[data-close]').addEventListener('click', () => closeDrawer(name));
+});
+document.addEventListener('keydown', (e) => {
+  const name = openName();
+  if (!name) return;
+  if (e.key === 'Escape') { closeDrawer(name); return; }
+  /* Keep Tab inside the open drawer. */
+  if (e.key === 'Tab') {
+    const items = [...drawers[name].querySelectorAll('button:not(:disabled), input:not(:disabled), select:not(:disabled), textarea, a[href], summary')]
+      .filter((x) => x.offsetParent !== null);
+    if (!items.length) return;
+    const first = items[0], last = items[items.length - 1];
+    if (e.shiftKey && document.activeElement === first) { e.preventDefault(); last.focus(); }
+    else if (!e.shiftKey && document.activeElement === last) { e.preventDefault(); first.focus(); }
+  }
+});
+
+/* --- posting accounts ---------------------------------------------------------- */
+
+let mode = null;          // 'social' (Upload-Post), 'meta' (direct), 'none', 'error'; null while checking
+let social = null;
+let meta = null;
+let accountError = '';
+let acctConfirm = false;  // the Meta Disconnect question is showing
+
+async function loadAccounts() {
+  /* Upload-Post first. The direct Meta connection is the fallback, used only
+     when the Worker has no Upload-Post key. */
+  let s;
+  try { s = await A.api('/social/account'); }
+  catch (err) {
+    /* The key is set but Upload-Post did not answer as expected. Say so,
+       rather than falling back to Meta, which would hide the reason. */
+    mode = 'error';
+    accountError = 'Couldn’t reach Upload-Post. ' + err.message;
+    accountsChanged();
+    return;
+  }
+  if (s && s.ready) { mode = 'social'; social = s; meta = null; accountsChanged(); return; }
+  try {
+    meta = await A.api('/meta/account');
+    social = null;
+    mode = meta.ready ? 'meta' : 'none';
+  } catch (err) {
+    mode = 'error';
+    accountError = 'Couldn’t check the connection. Try refreshing the page.';
+  }
+  accountsChanged();
+}
+
+function accountsChanged() {
+  drawNotices();
+  if (!drawers.acct.hidden) drawAccounts();
+  if (!drawers.sched.hidden && sched && sched.mode === 'new') drawWhere();
+}
+
+const handleOf = (a) => (a.handle ? (a.handle.startsWith('@') ? a.handle : '@' + a.handle) : (a.name || ''));
+
+/* Can a post go to this platform now, and if not, the few words why. */
+function avail(k) {
+  if (mode === 'social') {
+    const a = social.accounts[k];
+    if (!a) return { ok: false, why: 'not connected' };
+    if (a.reconnect) return { ok: false, why: 'sign in again', handle: handleOf(a) };
+    if (k === 'facebook' && (social.facebook_pages || []).length > 1 && !social.facebook_page_id) return { ok: false, why: 'choose a Page', handle: handleOf(a) };
+    return { ok: true, handle: handleOf(a) };
+  }
+  if (mode === 'meta' && meta.connected) {
+    /* YouTube and TikTok only go through Upload-Post. */
+    if (k === 'facebook') return { ok: true, handle: meta.page.page_name || '' };
+    if (k === 'instagram') return meta.page.ig_user_id ? { ok: true, handle: meta.page.ig_username ? '@' + meta.page.ig_username : '' } : { ok: false, why: 'not linked' };
+  }
+  return { ok: false, why: 'not connected' };
+}
+const stale = () => (mode === 'social' ? PLATFORMS.filter((k) => social.accounts[k] && social.accounts[k].reconnect) : []);
+
+/* Above the calendar: only what stops posts going out. */
+function drawNotices() {
+  const box = $('notices');
+  box.textContent = '';
+  /* The button says what it does: connect, while nothing is; afterwards,
+     how many are connected. */
+  const linked = PLATFORMS.filter((k) => avail(k).ok);
+  const btn = $('open-accounts');
+  btn.className = 'btn btn-sm ' + (mode !== 'none' && mode !== 'error' && !linked.length ? 'btn-p' : 'btn-s');
+  btn.textContent = linked.length ? 'Social accounts · ' + linked.length + ' of ' + PLATFORMS.length + ' connected' : 'Connect social accounts';
+  if (mode === 'none') {
+    box.append(el('div', { class: 'card pad callout', text: 'Posting isn’t set up yet. Ask whoever runs the app to connect Upload-Post.' }));
+  } else if ((mode === 'social' || mode === 'meta') && !linked.length) {
+    box.append(el('div', { class: 'card pad callout stack', style: { gap: '10px' } },
+      el('h2', { text: 'Connect your social accounts to post from here' }),
+      el('span', { class: 'ink', text: 'Link Instagram, TikTok, YouTube and Facebook once. After that, any video you schedule here goes out to them at the time you pick.' }),
+      el('span', { class: 'quiet', text: 'You sign in on each platform’s own page, so this app never sees your passwords.' }),
+      el('div', {}, el('button', { type: 'button', class: 'btn btn-p', onclick: openAccounts }, 'Connect social accounts'))));
+  } else if (mode === 'error') {
+    box.append(el('div', { class: 'card pad callout bad row' },
+      el('span', { class: 'ink grow', text: accountError }),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: loadAccounts }, 'Try again')));
+  }
+  for (const k of stale()) {
+    box.append(el('div', { class: 'card pad callout bad row' },
+      el('span', { class: 'ink grow', text: nameOf(k) + ' needs you to sign in again. Posts to it will fail until you do.' }),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: (e) => socialConnect(e.currentTarget, nameOf(k)) }, 'Sign in to ' + nameOf(k))));
+  }
+  box.hidden = !box.childElementCount;
+}
+
+function acctCard(name, state, sub, extra, actions) {
+  const tag = { connected: ['Connected', 'tag ok'], reconnect: ['Sign in again', 'tag bad'], unlinked: ['Not linked', 'tag warn'], off: ['Not connected', 'tag'] }[state];
+  return el('div', { class: 'card', style: { padding: '12px 16px', display: 'flex', flexDirection: 'column', gap: '8px' } },
+    el('div', { class: 'row', style: { gap: '10px' } },
+      el('span', { class: 'ink grow', style: { fontWeight: 600 }, text: name }),
+      el('span', { class: tag[1], text: tag[0] })),
+    sub ? el('span', { class: 'quiet', text: sub }) : null,
+    extra || null,
+    actions && actions.length ? el('div', { class: 'row', style: { gap: '4px' } }, actions) : null);
+}
+
+/* Which Facebook Page posts go to, when the account manages more than one. */
+function pagePicker(pages, chosenId, describe) {
+  const sel = el('select', { class: 'field', id: 'page-pick', style: { minHeight: '36px', maxWidth: '100%' } });
+  if (!chosenId) sel.append(el('option', { value: '' }, 'Choose…'));
+  for (const p of pages) sel.append(el('option', { value: p.page_id, selected: p.page_id === chosenId }, describe(p)));
+  sel.addEventListener('change', async () => {
+    if (!sel.value) return;
+    sel.disabled = true;
+    try {
+      await A.api(mode === 'social' ? '/social/facebook-page' : '/meta/pick', { page_id: sel.value });
+      toast('Page chosen');
+      await loadAccounts();
+    } catch (err) { toast(err.message); sel.disabled = false; }
+  });
+  return el('label', { class: 'row', style: { gap: '8px' }, for: 'page-pick' },
+    el('span', { class: 'quiet', text: 'Post to this Page' }), sel);
+}
+
+function drawAccounts() {
+  const body = $('acct-body');
+  const keepFocus = document.activeElement && body.contains(document.activeElement) ? document.activeElement.dataset.k : null;
+  body.textContent = '';
+  body.append(el('span', { class: 'quiet', text: 'You sign in on each platform’s own page, so this app never sees your passwords.' }));
+
+  if (!mode) {
+    body.append(el('span', { class: 'pulse', text: 'Checking the accounts…' }));
+  } else if (mode === 'none') {
+    body.append(el('div', { class: 'card pad callout', text: 'Posting isn’t set up yet. Ask whoever runs the app to connect Upload-Post.' }));
+  } else if (mode === 'error') {
+    body.append(el('span', { class: 'bad-text', text: accountError }),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', style: { alignSelf: 'flex-start' }, onclick: loadAccounts }, 'Try again'));
+  } else if (mode === 'social') {
+    for (const k of PLATFORMS) {
+      const a = social.accounts[k];
+      const state = !a ? 'off' : a.reconnect ? 'reconnect' : 'connected';
+      const sub = state === 'connected' ? (handleOf(a) || 'Connected')
+        : state === 'reconnect' ? (handleOf(a) ? handleOf(a) + ' · ' : '') + 'the sign-in ran out'
+          : k === 'tiktok' ? 'Not connected yet. TikTok needs a paid Upload-Post plan.' : 'Not connected yet';
+      const pages = social.facebook_pages || [];
+      const extra = k === 'facebook' && a && pages.length > 1 ? pagePicker(pages, social.facebook_page_id, (p) => p.page_name || p.page_id) : null;
+      const actions = state === 'connected' ? [] : [
+        el('button', { type: 'button', class: 'btn btn-p btn-sm', 'data-k': 'connect:' + k, onclick: (e) => socialConnect(e.currentTarget, nameOf(k)) }, state === 'reconnect' ? 'Sign in again' : 'Connect')];
+      body.append(acctCard(nameOf(k), state, sub, extra, actions));
+    }
+    /* Upload-Post has no way for the Worker to drop one account; that is done
+       on its own page, the same one Connect opens. */
+    body.append(el('div', { class: 'row', style: { gap: '4px' } },
+      el('span', { class: 'quiet grow', text: 'To disconnect an account or switch to another, use Upload-Post’s page.' }),
+      el('button', { type: 'button', class: 'btn-q', 'data-k': 'manage', onclick: (e) => socialConnect(e.currentTarget, 'Upload-Post') }, 'Open Upload-Post’s page ↗')));
+  } else if (mode === 'meta') {
+    const pages = meta.pages || [];
+    const picker = pages.length > 1 ? pagePicker(pages, meta.connected ? (pages.find((p) => p.selected) || {}).page_id : null,
+      (p) => p.page_name + (p.ig_username ? ' (and @' + p.ig_username + ')' : ' (no Instagram)')) : null;
+    if (meta.connected) {
+      const p = meta.page;
+      const fbActions = acctConfirm
+        ? [A.confirmRow('Disconnect? Scheduled posts to Facebook and Instagram will fail.', 'Disconnect', metaDisconnect, 'Keep',
+          () => { acctConfirm = false; refocusKey = 'disconnect'; drawAccounts(); }, true)]
+        : [el('button', { type: 'button', class: 'btn-q', 'data-k': 'connect:facebook', onclick: (e) => metaConnect(e.currentTarget) }, 'Connect again'),
+          el('button', { type: 'button', class: 'btn-q', 'data-k': 'disconnect', onclick: () => { acctConfirm = true; refocusKey = 'keep'; drawAccounts(); } }, 'Disconnect')];
+      if (acctConfirm) fbActions[0].querySelectorAll('button')[1].dataset.k = 'keep';
+      body.append(acctCard('Facebook', 'connected', p.page_name || 'Facebook Page', picker, fbActions));
+      body.append(p.ig_user_id
+        ? acctCard('Instagram', 'connected', p.ig_username ? '@' + p.ig_username : 'Connected through the Page', null, [])
+        : acctCard('Instagram', 'unlinked', 'No Instagram account is linked to this Page, so only Facebook posts can go out. Link them in the Business Portfolio, then connect again.', null, []));
+    } else {
+      body.append(acctCard('Facebook', 'off',
+        pages.length > 1 ? 'More than one Page came through. Choose the one posts go to.' : 'Connect the Page you post to. You sign in as yourself on Facebook.',
+        picker, [el('button', { type: 'button', class: 'btn btn-p btn-sm', 'data-k': 'connect:facebook', onclick: (e) => metaConnect(e.currentTarget) }, 'Connect')]));
+      body.append(acctCard('Instagram', 'off', 'Comes with the Facebook Page it’s linked to.', null, []));
+    }
+    body.append(acctCard('YouTube', 'off', 'Only available through Upload-Post.', null, []));
+    body.append(acctCard('TikTok', 'off', 'Only available through Upload-Post.', null, []));
+  }
+  body.append(el('span', { class: 'quiet', text: IMAGES_NOTE }));
+
+  const want = refocusKey || keepFocus;
+  refocusKey = null;
+  if (want) { const b = body.querySelector(`[data-k="${want}"]`); if (b) b.focus(); }
+}
+
+$('open-accounts').addEventListener('click', openAccounts);
+function openAccounts() { acctConfirm = false; drawAccounts(); openDrawer('acct'); }
+window.addEventListener('hashchange', () => { if (location.hash === '#accounts') openAccounts(); });
+
+/* The new tab is opened on the click itself and pointed at the sign-in page
+   once the Worker hands back the link: opening it after the await is what
+   browsers treat as a popup and block. */
+async function socialConnect(btn, what) {
+  const tab = window.open('', '_blank');
+  btn.disabled = true;
+  try {
+    const { url } = await A.api('/social/connect');
+    if (tab) { tab.location = url; toast('Opened ' + what + ' sign-in in a new tab. This page updates when you’re done.'); watchSocial(); }
+    else window.location.href = url;
+  } catch (err) {
+    if (tab) tab.close();
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* While the other tab is open, notice accounts as they are added or signed
+   in again: every 4 seconds for 4 minutes. */
+let socialWatch = null;
+const fingerprint = (s) => PLATFORMS.map((k) => (s.accounts[k] ? (s.accounts[k].reconnect ? 'r' : 'c') : '-')).join('');
+function watchSocial() {
+  clearTimeout(socialWatch);
+  let tries = 0;
+  let before = social ? fingerprint(social) : null;
+  const tick = async () => {
+    tries += 1;
+    let s = null;
+    try { s = await A.api('/social/account'); } catch (e) { /* try again */ }
+    if (s && s.ready) {
+      const now = fingerprint(s);
+      if (before !== null && now !== before) {
+        social = s; mode = 'social';
+        accountsChanged();
+        toast('Accounts updated');
+      }
+      before = now;
+    }
+    if (tries < 60) socialWatch = setTimeout(tick, 4000);
+  };
+  socialWatch = setTimeout(tick, 4000);
+}
+
+async function metaConnect(btn) {
+  const tab = window.open('', '_blank');
+  btn.disabled = true;
+  try {
+    const { url } = await A.api('/meta/start');
+    if (tab) { tab.location = url; toast('Opened Facebook sign-in in a new tab. This page updates when you’re done.'); watchMeta(0); }
+    else window.location.href = url;
+  } catch (err) {
+    if (tab) tab.close();
+    toast(err.message);
+  } finally {
+    btn.disabled = false;
+  }
+}
+
+/* While Facebook is being approved, check back every 3 seconds for two minutes. */
+function watchMeta(tries) {
+  setTimeout(async () => {
+    let acc = null;
+    try { acc = await A.api('/meta/account'); } catch (e) { /* try again */ }
+    /* Several Pages means a choice to make, which is also worth stopping for. */
+    if (acc && (acc.connected || (acc.pages || []).length > 1)) {
+      await loadAccounts();
+      toast(acc.connected ? 'Connected' : 'Choose a Page');
+      return;
+    }
+    if (tries < 40) watchMeta(tries + 1);
+  }, 3000);
+}
+
+async function metaDisconnect(e) {
+  busyRow(e.currentTarget, 'Disconnecting…');
+  try {
+    await A.api('/meta/disconnect');
+    acctConfirm = false;
+    toast('Disconnected');
+    await loadAccounts();
+  } catch (err) {
+    toast(err.message);
+    acctConfirm = false;
+    drawAccounts();
+  }
+}
+
+/* --- scheduling a video, or changing a post --------------------------------------
+
+   One drawer for both. New: pick a video, where, when, the YouTube title and
+   the caption, then /posts/create. Changing: the post's time and caption
+   only, through /posts/edit, so it keeps its place and its platforms. */
+
+let sched = null;
+const scripts = {};
+
+/* An hour from now, as the date and time boxes want it. */
+function inAnHour() {
+  const t = new Date(Date.now() + 3600000);
+  return { date: dayKey(t), time: timeOf(t) };
+}
+
+function openSchedule(opts) {
+  const group = opts.group || null;
+  const p0 = group ? group[0] : null;
+  let date, time;
+  if (group) {
+    /* A failed post's time has usually gone by; start from an hour from now then. */
+    const t = new Date(p0.scheduled_for);
+    const at = t.getTime() > Date.now() ? t : new Date(Date.now() + 3600000);
+    date = dayKey(at); time = timeOf(at);
+  } else {
+    const soon = inAnHour();
+    if (opts.day && opts.day > soon.date) { date = opts.day; time = '09:00'; }
+    else { date = soon.date; time = soon.time; }
+  }
+  sched = {
+    mode: group ? 'edit' : 'new',
+    group,
+    video: group ? videoFor(p0) : (opts.video || null),
+    plats: null,             // filled from what's available, until the viewer changes it
+    platsTouched: false,
+    ytTyped: false,
+  };
+  $('sched-title').textContent = group ? 'Change time or caption' : 'Schedule a video';
+  buildSchedule(date, time, group ? (p0.caption || '') : '');
+  openDrawer('sched');
+  if (sched.video) loadScript(sched.video);
+}
+
+function buildSchedule(date, time, caption) {
+  const body = $('sched-body');
+  body.textContent = '';
+  const isNew = sched.mode === 'new';
+
+  if (isNew) {
+    body.append(el('span', { class: 'lbl', id: 'pick-label', text: 'Which video' }));
+    const picks = el('div', { class: 'picks', role: 'group', 'aria-labelledby': 'pick-label', id: 'picks' });
+    const ready = videos.filter((v) => v.url && A.videoState(v, posts) === 'approved');
+    const other = videos.filter((v) => v.url && !['approved', 'making'].includes(A.videoState(v, posts))).slice(0, 40);
+    for (const v of ready) picks.append(pickButton(v));
+    if (other.length) {
+      picks.append(el('span', { class: 'eyebrow', style: { marginTop: ready.length ? '8px' : 0 }, text: 'Other finished videos' }));
+      for (const v of other) picks.append(pickButton(v));
+    }
+    if (!ready.length && !other.length) {
+      picks.append(el('span', { class: 'quiet', text: 'No finished videos yet. They show up here once they’re made.' }));
+    } else if (!ready.length) {
+      picks.prepend(el('span', { class: 'quiet', text: 'Nothing is approved yet. You can still schedule another finished video.' }));
+    }
+    body.append(picks);
+
+    body.append(el('span', { class: 'lbl', id: 'where-label', text: 'Where' }));
+    body.append(el('div', { id: 'where', role: 'group', 'aria-labelledby': 'where-label', class: 'row', style: { gap: '8px' } }));
+    body.append(el('div', { id: 'where-note', class: 'row', hidden: true }));
+  } else {
+    const v = sched.video;
+    const ps = sched.group;
+    const src = (v && v.url) || mediaUrl(ps[0]);
+    body.append(el('div', { class: 'row', style: { gap: '16px', flexWrap: 'nowrap' } },
+      src ? el('video', { class: 'pthumb', style: { width: '48px', height: '86px' }, src: src.split('#')[0] + '#t=1', preload: 'metadata', muted: true, playsinline: true, 'aria-hidden': 'true' }) : null,
+      el('div', { style: { display: 'flex', flexDirection: 'column', minWidth: 0 } },
+        el('h3', { text: v ? (v.topic || 'Untitled') : 'This post' }),
+        el('span', { class: 'quiet', text: 'Goes to ' + A.joinNames(ps.map((p) => nameOf(p.platform))) }))));
+  }
+
+  const today = todayKey();
+  body.append(el('span', { class: 'lbl', id: 'when-label', text: 'When' }),
+    el('div', { class: 'row', role: 'group', 'aria-labelledby': 'when-label', style: { gap: '8px' } },
+      el('input', { type: 'date', class: 'field', id: 'when-date', 'aria-label': 'Date', min: today, value: date, style: { width: 'auto' } }),
+      el('input', { type: 'time', class: 'field', id: 'when-time', 'aria-label': 'Time', value: time, style: { width: 'auto' } })));
+
+  if (isNew) {
+    const yt = el('input', { class: 'field', id: 'yt-title', maxlength: '100', value: sched.video ? (sched.video.topic || '').slice(0, 100) : '' });
+    const ytCount = el('span', { class: 'quiet count', id: 'yt-count', 'aria-live': 'off', text: yt.value.length + ' / 100' });
+    yt.addEventListener('input', () => { sched.ytTyped = !!yt.value; ytCount.textContent = yt.value.length + ' / 100'; });
+    body.append(el('div', { id: 'yt-wrap', style: { display: 'flex', flexDirection: 'column', gap: '4px' }, hidden: true },
+      el('span', { class: 'row', style: { justifyContent: 'space-between' } }, el('label', { class: 'lbl', for: 'yt-title', text: 'YouTube title' }), ytCount),
+      yt));
+  }
+
+  const cap = el('textarea', { class: 'field', id: 'caption', rows: '4', maxlength: '2200', placeholder: 'What it says underneath the video.' });
+  cap.value = caption;
+  const capCount = el('span', { class: 'quiet count', text: cap.value.length + ' / 2200' });
+  cap.addEventListener('input', () => { capCount.textContent = cap.value.length + ' / 2200'; });
+  body.append(el('div', { style: { display: 'flex', flexDirection: 'column', gap: '4px' } },
+    el('span', { class: 'row', style: { justifyContent: 'space-between' } }, el('label', { class: 'lbl', for: 'caption', text: 'Caption' }), capCount),
+    cap));
+
+  body.append(el('details', { id: 'script', hidden: !sched.video },
+    el('summary', { class: 'quiet', style: { cursor: 'pointer', minHeight: '32px' } }, 'What it says (to lift lines from)'),
+    el('div', { id: 'script-lines' })));
+
+  body.append(el('p', { id: 'sched-error', role: 'alert', class: 'bad-text', style: { margin: 0, fontSize: '14px' } }));
+
+  body.append(el('div', { class: 'row' },
+    el('button', { type: 'button', class: 'btn-q', onclick: () => closeDrawer('sched') }, 'Not now'),
+    el('span', { class: 'grow' }),
+    el('button', { type: 'button', class: 'btn btn-p', id: 'sched-go', onclick: isNew ? submitNew : submitEdit }, isNew ? 'Schedule it' : 'Save changes')));
+
+  if (isNew) {
+    body.append(el('span', { class: 'quiet', text: IMAGES_NOTE }));
+    drawWhere();
+  }
+}
+
+function pickButton(v) {
+  const s = A.videoState(v, posts);
+  return el('button', {
+    type: 'button', class: 'card row pick', 'aria-pressed': String(!!sched.video && sched.video.id === v.id), 'data-id': v.id,
+    onclick: () => pickVideo(v),
+  },
+  el('video', { class: 'pthumb', src: v.url.split('#')[0] + '#t=1', preload: 'metadata', muted: true, playsinline: true, 'aria-hidden': 'true' }),
+  el('span', { class: 'ink grow', style: { fontWeight: 600, minWidth: 0, overflowWrap: 'anywhere' }, text: v.topic || 'Untitled' }),
+  el('span', { class: 'quiet', style: { whiteSpace: 'nowrap' }, text: [v.duration ? A.clock(v.duration) : '', A.STATE_LABEL[s] || ''].filter(Boolean).join(' · ') }));
+}
+
+function pickVideo(v) {
+  sched.video = v;
+  document.querySelectorAll('#picks .pick').forEach((b) => b.setAttribute('aria-pressed', String(b.dataset.id === v.id)));
+  const yt = $('yt-title');
+  if (yt && !sched.ytTyped) { yt.value = (v.topic || '').slice(0, 100); $('yt-count').textContent = yt.value.length + ' / 100'; }
+  $('sched-error').textContent = '';
+  loadScript(v);
+}
+
+/* The script it was made from, to lift lines into the caption. */
+async function loadScript(v) {
+  const box = $('script');
+  const lines = $('script-lines');
+  if (!box) return;
+  box.hidden = false;
+  if (scripts[v.id] === undefined) {
+    lines.textContent = '';
+    lines.append(el('span', { class: 'pulse', text: 'Loading the script…' }));
+    try { scripts[v.id] = (await A.api('/videos/script', { id: v.id })).lines || null; }
+    catch (e) { scripts[v.id] = null; }
+  }
+  if (!sched || !sched.video || sched.video.id !== v.id || !$('script-lines')) return;
+  const box2 = $('script-lines');
+  box2.textContent = '';
+  const got = scripts[v.id];
+  if (got && got.length) {
+    box2.append(el('ol', { class: 'ink', style: { margin: '6px 0 0', paddingLeft: '20px', fontSize: '14px' } }, got.map((l) => el('li', { text: l }))));
+  } else {
+    box2.append(el('span', { class: 'quiet', text: 'No script was kept for this one.' }));
+  }
+}
+
+/* The platform chips, redrawn whenever the accounts change. */
+function drawWhere() {
+  const box = $('where');
+  if (!box) return;
+  const ok = PLATFORMS.filter((k) => avail(k).ok);
+  if (!sched.platsTouched || !sched.plats) sched.plats = new Set(ok);
+  else for (const k of [...sched.plats]) if (!ok.includes(k)) sched.plats.delete(k);
+
+  box.textContent = '';
+  for (const k of PLATFORMS) {
+    const a = avail(k);
+    const on = a.ok && sched.plats.has(k);
+    box.append(el('button', {
+      type: 'button', class: 'chip', 'aria-pressed': String(on), disabled: !a.ok,
+      title: a.ok ? (a.handle ? 'Posts as ' + a.handle : null) : 'Connect it under Social accounts',
+      onclick: () => {
+        sched.platsTouched = true;
+        if (sched.plats.has(k)) sched.plats.delete(k); else sched.plats.add(k);
+        drawWhere();
+        const again = $('where').querySelectorAll('button')[PLATFORMS.indexOf(k)];
+        if (again) again.focus();
+      },
+    }, nameOf(k) + (a.ok ? '' : ' · ' + a.why)));
+  }
+
+  const note = $('where-note');
+  note.textContent = '';
+  note.hidden = !!ok.length || !mode;
+  if (!ok.length && mode) {
+    note.append(el('span', { class: 'quiet grow', text: mode === 'none' ? 'Posting isn’t set up yet. Ask whoever runs the app to connect Upload-Post.' : 'Nothing is connected to post to yet.' }));
+    if (mode !== 'none') note.append(el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: openAccounts }, 'Open Social accounts'));
+  }
+
+  /* The YouTube title only matters when YouTube is ticked. */
+  const yt = $('yt-wrap');
+  if (yt) yt.hidden = !sched.plats.has('youtube');
+}
+
+function readWhen() {
+  const d = $('when-date').value;
+  const t = $('when-time').value;
+  if (!d || !t) return { error: 'Choose when it goes out.' };
+  const at = new Date(`${d}T${t}`);
+  if (Number.isNaN(at.getTime())) return { error: 'Choose when it goes out.' };
+  /* A minute's grace, the same as the Worker gives. */
+  if (at.getTime() < Date.now() - 60000) return { error: 'That time has already gone by.' };
+  return { at };
+}
+
+async function submitNew(e) {
+  const err = $('sched-error');
+  err.textContent = '';
+  const v = sched.video;
+  if (!v) { err.textContent = 'Pick a video first.'; return; }
+  const when = readWhen();
+  if (when.error) { err.textContent = when.error; return; }
+  const platforms = PLATFORMS.filter((k) => sched.plats.has(k) && avail(k).ok);
+  if (!platforms.length) { err.textContent = 'Choose at least one place to post it.'; return; }
+  const title = $('yt-title').value.trim();
+  if (platforms.includes('youtube') && !title) { err.textContent = 'YouTube needs a title.'; $('yt-title').focus(); return; }
+
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Scheduling…';
+  try {
+    await A.api('/posts/create', {
+      kind: 'reel',
+      media: [{ url: v.url, kind: 'video' }],
+      caption: $('caption').value,
+      scheduled_for: when.at.toISOString(),
+      render_id: v.id,
+      platforms,
+      title: platforms.includes('youtube') ? title : undefined,
+    });
+  } catch (x) {
+    err.textContent = x.message;
+    btn.disabled = false;
+    btn.textContent = 'Schedule it';
+    return;
+  }
+  closeDrawer('sched');
+  toast(platforms.length > 1 ? 'Scheduled for ' + platforms.length + ' places' : 'Scheduled');
+  calMonth = new Date(when.at.getFullYear(), when.at.getMonth(), 1);
+  selectedDay = dayKey(when.at);
+  confirmPost = null;
+  await loadData(true);
+}
+
+async function submitEdit(e) {
+  const err = $('sched-error');
+  err.textContent = '';
+  const when = readWhen();
+  if (when.error) { err.textContent = when.error; return; }
+  const ps = sched.group;
+  const caption = $('caption').value;
+  const before = { at: ps[0].scheduled_for, caption: ps[0].caption || '' };
+
+  const btn = e.currentTarget;
+  btn.disabled = true;
+  btn.textContent = 'Saving…';
+  try {
+    await Promise.all(ps.map((p) => A.api('/posts/edit', { id: p.id, caption, scheduled_for: when.at.toISOString() })));
+  } catch (x) {
+    err.textContent = x.message;
+    btn.disabled = false;
+    btn.textContent = 'Save changes';
+    await loadData(true);   // some may have saved; show what is true now
+    return;
+  }
+  closeDrawer('sched');
+  /* Undo puts the old time and caption back, while the old time is still to come. */
+  const undo = new Date(before.at).getTime() > Date.now() + 60000 ? async () => {
+    try {
+      await Promise.all(ps.map((p) => A.api('/posts/edit', { id: p.id, caption: before.caption, scheduled_for: before.at })));
+      toast('Put back');
+    } catch (x) { toast(x.message); }
+    calMonth = new Date(new Date(before.at).getFullYear(), new Date(before.at).getMonth(), 1);
+    selectedDay = dayKey(before.at);
+    await loadData(true);
+  } : null;
+  toast('Saved. It goes out ' + A.fmtWhen(when.at) + '.', undo);
+  calMonth = new Date(when.at.getFullYear(), when.at.getMonth(), 1);
+  selectedDay = dayKey(when.at);
+  confirmPost = null;
+  await loadData(true);
+}
+
+/* --- start ------------------------------------------------------------------------ */
+
+draw();
+if (location.hash === '#accounts') openAccounts();
+
+Promise.all([loadData(), loadAccounts()]).then(() => {
+  /* ?video=<id>: Videos and Create link here to schedule one video. */
+  const want = params.get('video');
+  if (!want) return;
+  const u = new URL(location.href);
+  u.searchParams.delete('video');
+  history.replaceState(null, '', u.pathname + u.search + u.hash);
+  openSchedule({ video: videos.find((v) => v.id === want) || null });
+});
+</script>
+</body>
+</html>

@@ -1,0 +1,42 @@
+node_modules/
+package-lock.json
+.DS_Store
+worker/node_modules/
+worker/package-lock.json
+.wrangler/
+data/sql/
+
+# Source material is yours, not the repo's. The folder structure is tracked via
+# .gitkeep; what you drop into it is not. This repo is public, and a knowledge
+# base of transcripts and licensed research must not be published with it.
+#
+# Note the shape: excluding kb/files/** would exclude the directories too, and
+# git will not descend into an excluded directory to re-include a file in it,
+# so the .gitkeep negation would silently do nothing.
+kb/files/*/*
+!kb/files/*/.gitkeep
+
+# --- video pipeline (video/) --------------------------------------------
+# node_modules and the Chrome it downloads are ~326MB; the rendered output and
+# the stock footage are both regenerated per run by the Assets stage.
+video/remotion/node_modules/
+video/remotion/out/
+video/remotion/_voiceover/
+video/remotion/_voiceover_*/
+video/remotion/public/*/
+!video/remotion/public/fonts/
+# The Buy Box logo, which every video's closing frame uses.
+!video/remotion/public/brand/
+# The channel's own photographs, which every video opens on.
+!video/remotion/public/library/
+video/.env
+# Python leaves these behind whenever the voiceover template is imported.
+__pycache__/
+# The per-run copy of the pipeline script with the locked brief written in.
+video/remotion/.run/
+
+# The lockfile is the exception to the blanket package-lock rule above. Renders
+# run unattended, so the install has to be reproducible: without it `npm ci`
+# degrades to `npm install` and a transitive dependency can change under a
+# pipeline nobody is watching.
+!video/remotion/package-lock.json

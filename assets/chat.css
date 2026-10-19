@@ -1,0 +1,262 @@
+/* ---------------------------------------------------------------------------
+ * Shared chat styling. Used full-width on the planner page and inside a
+ * floating panel on the briefing.
+ *
+ * Everything is scoped under .chat so it cannot collide with the briefing's own
+ * classes, and colours come from --chat-* variables that each page maps to its
+ * own palette — the two pages name their accent differently, and the chat
+ * should not have to know which.
+ * ------------------------------------------------------------------------ */
+
+.chat {
+  --chat-accent:  var(--accent, var(--accent-on-ground, #2C785E));
+  --chat-card:    var(--card, #F4F2E7);
+  --chat-sunk:    var(--card-sunk, #E3DFCB);
+  --chat-rule:    var(--rule, #D2CDB6);
+  --chat-rule-2:  var(--rule-strong, #B8B29A);
+  --chat-ink:     var(--ink, #103224);
+  --chat-body:    var(--ink-body, #3B5850);
+  --chat-quiet:   var(--ink-quiet, #6F8279);
+  --chat-clay:    var(--clay, #A65A3C);
+  --chat-go:      var(--emerald, #2C785E);
+  --chat-sans:    var(--sans, system-ui, sans-serif);
+  --chat-mono:    var(--mono, ui-monospace, monospace);
+
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  font-family: var(--chat-sans);
+  color: var(--chat-body);
+}
+
+.chat-scroll { flex: 1; overflow-y: auto; min-height: 0; }
+
+.chat .starter-label {
+  margin: 0 0 .5rem;
+  font-size: .625rem; letter-spacing: .14em; text-transform: uppercase;
+  font-weight: 700; color: var(--chat-quiet);
+}
+.chat .starters { display: flex; flex-wrap: wrap; gap: .5rem; margin-bottom: 1.25rem; }
+.chat .starters:last-of-type { margin-bottom: 1.5rem; }
+.chat .starters button {
+  font-family: var(--chat-sans); font-size: .8125rem; color: var(--chat-body);
+  background: transparent; border: 1px solid var(--chat-rule-2); border-radius: 999px;
+  padding: .4375rem .875rem; cursor: pointer; text-align: left;
+  transition: border-color .15s ease, color .15s ease;
+}
+.chat .starters button:hover { border-color: var(--chat-accent); color: var(--chat-ink); }
+.chat .starters button:disabled { opacity: .5; cursor: not-allowed; }
+
+.chat .msg { margin-bottom: 1.5rem; }
+.chat .msg .who {
+  font-size: .625rem; letter-spacing: .14em; text-transform: uppercase;
+  font-weight: 700; color: var(--chat-accent); margin-bottom: .375rem;
+}
+.chat .msg.user .bubble {
+  background: var(--chat-sunk); border: 1px solid var(--chat-rule);
+  border-radius: 4px; padding: .75rem 1rem; color: var(--chat-ink);
+}
+.chat .msg.bot .bubble { white-space: pre-wrap; }
+.chat .msg.bot .bubble strong { color: var(--chat-ink); }
+.chat .msg.bot .bubble h3 { font-size: 1rem; color: var(--chat-ink); margin: 1.25rem 0 .375rem; }
+.chat .msg.bot .bubble h4 { font-size: .9375rem; color: var(--chat-ink); margin: 1rem 0 .25rem; }
+.chat .msg.bot .bubble a { color: var(--chat-accent); text-decoration: underline; text-underline-offset: 2px; }
+.chat .msg.bot .bubble code {
+  font-family: var(--chat-mono); font-size: .8125rem;
+  background: var(--chat-sunk); padding: .0625rem .3125rem; border-radius: 2px;
+}
+.chat .msg.error .bubble {
+  border: 1px solid var(--chat-clay); border-left: 3px solid var(--chat-clay);
+  border-radius: 4px; padding: .75rem 1rem; color: var(--chat-clay); font-size: .875rem;
+}
+
+/* The one line shown while the agent works. Quiet on purpose: it says
+   "still going", not what is being searched. */
+.chat .status {
+  font-size: .8125rem; color: var(--chat-quiet); font-style: italic;
+  animation: chat-pulse 1.6s ease-in-out infinite;
+}
+@keyframes chat-pulse { 50% { opacity: .45; } }
+@media (prefers-reduced-motion: reduce) { .chat .status { animation: none; } }
+
+.chat .cursor::after { content: "▍"; color: var(--chat-accent); animation: chat-blink 1s step-end infinite; }
+@keyframes chat-blink { 50% { opacity: 0; } }
+@media (prefers-reduced-motion: reduce) { .chat .cursor::after { animation: none; } }
+
+/* Attachments — the tray above the composer while files are staged, and the
+   read-only chips under the message that carried them. Same chip either way;
+   only the tray's chips get a remove button. */
+.chat .attachments {
+  display: flex; flex-wrap: wrap; gap: .375rem; margin-top: .5rem;
+}
+.chat .chip {
+  display: inline-flex; align-items: center; gap: .375rem;
+  font-family: var(--chat-sans); font-size: .75rem; color: var(--chat-body);
+  background: var(--chat-sunk); border: 1px solid var(--chat-rule);
+  border-radius: 999px; padding: .1875rem .625rem; max-width: 18rem;
+}
+.chat .chip .label { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.chat .chip .size { color: var(--chat-quiet); font-family: var(--chat-mono); font-size: .6875rem; flex: none; }
+.chat .chip .drop {
+  font-family: var(--chat-sans); font-size: .875rem; line-height: 1;
+  color: var(--chat-quiet); background: none; border: none;
+  padding: 0 0 .0625rem; cursor: pointer; flex: none;
+}
+.chat .chip .drop:hover { color: var(--chat-clay); }
+.chat .chip.pending .label { opacity: .6; }
+
+/* Recordings handed to a planning session. An attachment is read once by the
+   model; a recording is already transcribed and in the corpus, so picking one
+   only tells the planner to read that one in full. */
+.chat .recordings {
+  display: flex;
+  flex-wrap: wrap;
+  gap: .375rem;
+  align-items: center;
+  margin: 0 0 .5rem;
+  font-size: .75rem;
+  color: var(--ink-quiet);
+}
+.chat .rec-chip {
+  font: inherit;
+  font-size: .75rem;
+  color: var(--ink-body);
+  background: var(--card);
+  border: 1px solid var(--rule-strong);
+  border-radius: 999px;
+  padding: .125rem .625rem;
+  cursor: pointer;
+}
+.chat .rec-chips {
+  display: inline-flex;
+  flex-wrap: wrap;
+  gap: .375rem;
+}
+.chat .rec-chip:hover { border-color: var(--accent); }
+.chat .rec-chip[aria-busy="true"] {
+  border-style: dashed;
+  cursor: default;
+  opacity: .75;
+}
+.chat .rec-chip.bad {
+  color: var(--clay);
+  border-color: var(--clay);
+}
+.chat .rec-chip[aria-pressed="true"] {
+  background: var(--accent);
+  border-color: var(--accent);
+  color: #F4F2E7;
+  font-weight: 600;
+}
+.chat .rec-manage {
+  color: var(--ink-quiet);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+  white-space: nowrap;
+}
+
+.chat .attach-error {
+  margin: .5rem 0 0; font-size: .75rem; color: var(--chat-clay);
+}
+
+/* Dragging a file anywhere over the composer highlights the whole footer, so
+   the drop target is the obvious thing rather than a 3mm strip. */
+.chat-dropzone.dragover { outline: 2px dashed var(--chat-accent); outline-offset: -4px; }
+
+.chat-composer .chat-attach {
+  flex: none; display: inline-flex; align-items: center; justify-content: center;
+  width: 44px; height: 44px; padding: 0; cursor: pointer;
+  color: var(--chat-body); background: transparent;
+  border: 1px solid var(--chat-rule-2); border-radius: 4px;
+}
+.chat-composer .chat-attach:hover { border-color: var(--chat-accent); color: var(--chat-ink); }
+.chat-composer .chat-attach:disabled { opacity: .5; cursor: not-allowed; }
+.chat-composer .chat-attach:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+
+.chat-composer { display: flex; gap: .625rem; align-items: flex-end; }
+.chat-composer textarea {
+  flex: 1; font-family: var(--chat-sans); font-size: .9375rem; color: var(--chat-ink);
+  background: var(--chat-card); border: 1px solid var(--chat-rule-2); border-radius: 4px;
+  padding: .6875rem .875rem; resize: none; min-height: 44px; max-height: 160px; line-height: 1.5;
+}
+.chat-composer textarea:focus { outline: 2px solid var(--chat-accent); outline-offset: 1px; }
+.chat-composer button {
+  font-family: var(--chat-sans); font-size: .875rem; font-weight: 600; color: #F4F2E7;
+  background: var(--chat-go); border: none; border-radius: 4px;
+  padding: .6875rem 1.25rem; cursor: pointer; min-height: 44px;
+}
+.chat-composer button:disabled { opacity: .5; cursor: not-allowed; }
+.chat-composer button:focus-visible { outline: 2px solid var(--chat-accent); outline-offset: 2px; }
+.chat-hint { margin: .5rem 0 0; font-size: .6875rem; color: var(--chat-quiet); }
+
+.chat-setup {
+  background: var(--chat-card); border: 1px dashed var(--chat-clay);
+  border-radius: 4px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+}
+.chat-setup h3 { margin: 0 0 .5rem; font-size: .9375rem; color: var(--chat-clay); }
+.chat-setup code {
+  font-family: var(--chat-mono); font-size: .8125rem;
+  background: var(--chat-sunk); padding: .125rem .375rem; border-radius: 2px;
+}
+
+/* Adding a staged text file to the knowledge base. Deliberately quieter than
+   the send button: this is the rarer action, and an accidental permanent write
+   to the corpus is much more annoying to undo than an accidental message. */
+/* The [hidden] attribute is a UA rule of display:none, and any class rule that
+   sets display beats it on specificity. Without this the bar is visible with
+   nothing staged, which is how it shipped. */
+.chat .kb-add[hidden] { display: none; }
+.chat .kb-add {
+  display: flex; align-items: center; flex-wrap: wrap; gap: .5rem;
+  margin-top: .5rem; font-family: var(--chat-sans); font-size: .75rem;
+  color: var(--chat-quiet);
+}
+.chat .kb-add .kb-count { color: var(--chat-body); }
+.chat .kb-add select {
+  font-family: var(--chat-sans); font-size: .75rem; color: var(--chat-body);
+  background: var(--chat-card); border: 1px solid var(--chat-rule);
+  border-radius: .25rem; padding: .125rem .375rem;
+}
+.chat .kb-add button {
+  font-family: var(--chat-sans); font-size: .75rem; color: var(--chat-body);
+  background: var(--chat-sunk); border: 1px solid var(--chat-rule);
+  border-radius: 999px; padding: .1875rem .75rem; cursor: pointer;
+}
+.chat .kb-add button:hover:not(:disabled) { color: var(--chat-ink); border-color: var(--chat-accent); }
+.chat .kb-add button:disabled { opacity: .5; cursor: default; }
+.chat .kb-status { font-family: var(--chat-mono); font-size: .6875rem; }
+.chat .kb-status.ok { color: var(--chat-go); }
+.chat .kb-status.bad { color: var(--chat-clay); }
+
+/* The end of a planning session: the agreed videos, one per row, and the one
+   button that sends them to render. */
+.chat .plan-confirm {
+  margin-top: .875rem; border: 1px solid var(--chat-rule); border-radius: 4px;
+  background: var(--chat-card); overflow: hidden;
+}
+.chat .plan-confirm .pc-head {
+  padding: .625rem .875rem; font-size: .8125rem; font-weight: 600; color: var(--chat-ink);
+}
+.chat .plan-confirm table { width: 100%; border-collapse: collapse; font-size: .875rem; }
+.chat .plan-confirm th,
+.chat .plan-confirm td { text-align: left; padding: .5rem .875rem; vertical-align: top; }
+.chat .plan-confirm th {
+  font-family: var(--chat-mono); font-size: .6875rem; font-weight: 500; color: var(--chat-quiet);
+  text-transform: uppercase; letter-spacing: .04em; border-top: 1px solid var(--chat-rule);
+}
+.chat .plan-confirm td { border-top: 1px solid var(--chat-rule); color: var(--chat-ink); }
+.chat .plan-confirm td.pc-num { width: 2.75rem; font-family: var(--chat-mono); color: var(--chat-quiet); }
+.chat .plan-confirm .pc-foot {
+  display: flex; flex-wrap: wrap; gap: .625rem; align-items: center;
+  padding: .75rem .875rem; border-top: 1px solid var(--chat-rule); background: var(--chat-sunk);
+}
+.chat .plan-confirm .pc-note { font-size: .8125rem; color: var(--chat-body); margin-right: auto; }
+.chat .plan-confirm .pc-note.bad { color: var(--chat-clay); }
+.chat .plan-confirm .pc-note.ok { color: var(--chat-go); }
+.chat .plan-confirm button {
+  font-family: var(--chat-sans); font-size: .8125rem; font-weight: 600; border: none; border-radius: 4px;
+  padding: .4375rem 1rem; cursor: pointer; background: var(--chat-go); color: #F4F2E7;
+}
+.chat .plan-confirm button:disabled { opacity: .5; cursor: not-allowed; }
+.chat .plan-confirm button[hidden] { display: none; }
+.chat .plan-confirm.stale { opacity: .55; }

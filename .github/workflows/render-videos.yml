@@ -1,0 +1,987 @@
+name: Render videos
+
+# Turns a locked plan into finished videos.
+#
+# Briefs come from kb.planning_sessions, not from a file in this repo. That is
+# the point of living in the same repo as the planner: locking a plan on the
+# Plan page is what makes it renderable, with nobody copying JSON between two
+# places. It also keeps a forward-looking content plan out of git history.
+#
+# The pipeline's stages are agents, not code — each is given prose instructions
+# and does the work itself, writing a Remotion component, running the render,
+# reading the error, fixing it. So this runs Claude Code headless, not a script.
+#
+# One job per video, fail-fast off: video 2 failing must not take 1 and 3 with
+# it. Nothing is published — the artifacts are for review.
+#
+# It also applies edits. The Output page queues a typed change in
+# kb.video_edits and the Worker starts this workflow with edit_id set, so the
+# run covers that one video. If the video's source was kept (packed after every
+# render by video/pack-source.sh), the render job restores it and an agent
+# changes only what was asked. If not — videos made before sources were kept —
+# the pipeline re-makes it from its brief with the change added. Either way the
+# result is stored as a new version of the same slot.
+#
+# A re-make, chosen on the Edit page when the problem is what the video says,
+# always takes the second path, kept source or not, and its change may overrule
+# the plan (the opening line included). Lines rewritten on the Edit page's
+# script panel reach the edit agent as data (SCRIPT_CHANGES).
+
+run-name: ${{ inputs.edit_id != '' && 'Edit video' || 'Render videos' }}
+
+on:
+  workflow_dispatch:
+    inputs:
+      session_id:
+        description: 'Planning session to render. Blank = the most recently completed plan.'
+        type: string
+        default: ''
+      only:
+        description: 'Slots to render, e.g. 2 or 2,3 (blank = all of them)'
+        type: string
+        default: ''
+      max_turns:
+        description: 'Cap on agent turns per video — the runaway guard'
+        type: string
+        default: '120'
+      edit_id:
+        description: 'Set by the Output page to apply a typed change to one finished video. Leave blank for a normal render.'
+        type: string
+        default: ''
+
+# Renders queue behind each other. Each edit gets a group of its own: GitHub
+# keeps only one waiting run per group and cancels the one before it, so a
+# shared group would let an edit silently cancel a waiting render batch, or a
+# second edit cancel the first while the page still showed it as editing.
+#
+# Plans get a group each too, for the same reason. The Plan page can start a
+# render any time, and with one shared group a third batch pressed while one
+# rendered and one waited would silently cancel the waiting one, which the
+# database would then refuse to send again. Runs for the same plan still queue.
+concurrency:
+  group: ${{ inputs.edit_id != '' && format('render-videos-edit-{0}', inputs.edit_id) || format('render-videos-plan-{0}', inputs.session_id != '' && inputs.session_id || 'latest') }}
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.build.outputs.matrix }}
+      session: ${{ steps.build.outputs.session }}
+      count: ${{ steps.build.outputs.count }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - id: build
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SESSION_ID: ${{ inputs.session_id }}
+          ONLY: ${{ inputs.only }}
+          EDIT_ID: ${{ inputs.edit_id }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        run: |
+          node - <<'EOF' >> "$GITHUB_OUTPUT"
+          const base = (process.env.SUPABASE_URL || '').replace(/\/+$/, '');
+          const key = process.env.SUPABASE_SERVICE_ROLE_KEY || '';
+          if (!base || !key) throw new Error('SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY are not set');
+
+          /* Supabase's API sometimes times out for a few seconds (an edit was
+           * lost to two 504s that way on 2026-09-13), so a call is tried up to
+           * 4 times when the answer means "try again": no answer, 429, 502,
+           * 503 or 504. Repeating kb_plans_ready is harmless. Repeating
+           * kb_video_edit_start after an attempt that did go through is
+           * refused ("not waiting to start"), which fails the run cleanly, and
+           * the last step of this job then records the edit as failed. */
+          const RETRY_AFTER_MS = [5000, 10000, 20000];
+          const sleep = (ms) => new Promise((resolve) => setTimeout(resolve, ms));
+          const call = async (fn, body) => {
+            for (let attempt = 0; ; attempt++) {
+              let res = null;
+              let problem;
+              try {
+                res = await fetch(`${base}/rest/v1/rpc/${fn}`, {
+                  method: 'POST',
+                  headers: { apikey: key, authorization: `Bearer ${key}`, 'content-type': 'application/json' },
+                  body: JSON.stringify(body),
+                  signal: AbortSignal.timeout(30000),
+                });
+                if (res.ok) return res.json();
+                problem = `${res.status}: ${(await res.text()).slice(0, 300)}`;
+              } catch (err) {
+                problem = `no answer: ${err.message}`;
+              }
+              const again = !res || [429, 502, 503, 504].includes(res.status);
+              if (!again || attempt >= RETRY_AFTER_MS.length) throw new Error(`${fn} failed (${problem})`);
+              // stderr, because stdout is this step's outputs.
+              console.error(`${fn} failed (${problem}); trying again in ${RETRY_AFTER_MS[attempt] / 1000}s`);
+              await sleep(RETRY_AFTER_MS[attempt]);
+            }
+          };
+          const text = (v) => Array.isArray(v) ? v.filter(Boolean).join('; ').trim()
+            : typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
+          const nameOf = (topic) => String(topic).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
+
+          /* Every video opens on a photo from the channel's library, and each
+           * render chose with no idea what the others had, so the same one kept
+           * coming back. Photos the newest videos used are left out, newest
+           * video first, until only KEEP_FRESH would be left to choose from;
+           * the pipeline then picks whichever of the rest fits. Videos in one
+           * batch render side by side, so each also gets the remaining photos
+           * in a different order, to break ties differently. Losing the history
+           * costs the rotation, not the render. */
+          const KEEP_FRESH = 6;
+          const { readdirSync } = await import('node:fs');
+          const LIBRARY = readdirSync('video/remotion/public/library').filter((f) => f.endsWith('.jpg')).sort();
+          let recent = [];
+          try {
+            recent = await call('kb_recent_photos', { p_videos: 12 });
+          } catch (err) {
+            console.error(`${err.message}; no photos left out this time`);
+          }
+          const avoid = new Set();
+          for (const row of recent) {
+            const used = (Array.isArray(row.photos) ? row.photos : []).filter((p) => LIBRARY.includes(p) && !avoid.has(p));
+            if (LIBRARY.length - avoid.size - used.length < KEEP_FRESH) break;
+            used.forEach((p) => avoid.add(p));
+          }
+          const fresh = LIBRARY.filter((p) => !avoid.has(p));
+          const photosFor = (i, of) => {
+            const step = Math.max(1, Math.ceil(fresh.length / Math.max(1, of)));
+            const at = (i * step) % Math.max(1, fresh.length);
+            return { photos_avoid: [...avoid], photos_order: [...fresh.slice(at), ...fresh.slice(0, at)] };
+          };
+          console.error(`Photos left out as recently used: ${[...avoid].join(', ') || '(none)'}`);
+
+          const editId = (process.env.EDIT_ID || '').trim();
+          if (editId) {
+            /* An edit: one video, the one the Output page asked about.
+             * Starting it marks the request running, so the page shows the
+             * video as editing. */
+            const edit = await call('kb_video_edit_start', { p_edit_id: editId, p_run_url: process.env.RUN_URL });
+            const s = edit.plan_slot || {};
+            const topic = text(edit.topic);
+            /* Notes from the Edit tab, most pinned to a moment of the video.
+             * Each pinned one gets a frame grab, cut in the next step and named
+             * in its line, so the agent can look at what the reviewer saw. */
+            const notes = Array.isArray(edit.notes) ? edit.notes : [];
+            const clock = (t) => `${Math.floor(t / 60)}:${String(Math.floor(t % 60)).padStart(2, '0')}`;
+            const frameDir = `${process.env.GITHUB_WORKSPACE}/video/remotion/.edit/frames`;
+            const frames = notes
+              .map((n, i) => (n.at == null ? null : { file: `note-${i + 1}.jpg`, at: Number(n.at) }))
+              .filter(Boolean);
+            /* Narration lines rewritten on the Edit page's script panel,
+             * numbered from 1. They follow the notes in the instruction, and go
+             * to the edit agent as data as well, so it can put each in place. */
+            const scriptChanges = (Array.isArray(edit.script_changes) ? edit.script_changes : [])
+              .filter((c) => c && Number.isInteger(c.line) && typeof c.to === 'string');
+            const asked = [
+              ...notes.map((n, i) => (n.at == null
+                ? `Whole video: ${n.note}`
+                : `At ${clock(n.at)} (frame ${Math.round(n.at * 30)}; frame grab: ${frameDir}/note-${i + 1}.jpg): ${n.note}`)),
+              ...scriptChanges.map((c) => `Narration line ${c.line}: change "${c.from}" to "${c.to}"`),
+            ];
+            const instruction = asked.length
+              ? asked.map((line, i) => `${i + 1}. ${line}`).join('\n')
+              : text(edit.instruction);
+            /* A re-make is the pipeline again, from the plan, with the change
+             * requested in its brief: a kept source is not used. */
+            const remake = edit.mode === 'remake';
+            const hasSource = Boolean(edit.source_path) && !remake;
+            const include = [{
+              slot: edit.slot,
+              name: nameOf(topic),
+              topic,
+              edit_id: edit.edit_id,
+              edit_of: edit.render_id,
+              instruction,
+              has_source: hasSource,
+              has_frames: frames.length > 0,
+              script_changes: JSON.stringify(scriptChanges),
+              /* Only used when there is no source to edit: the pipeline then
+               * re-makes the video from its brief, with the change added. */
+              brief: JSON.stringify({
+                topic,
+                goal: text(edit.goal),
+                angle: text(s.angle),
+                hook: text(s.hook) || text(s.opening_line),
+                evidence: text(s.evidence),
+                product: text(s.product),
+                audience: text(s.audience),
+                source_ids: (s.source_ids || []).filter((x) => typeof x === 'string' && x.trim()),
+                revision: instruction,
+                remake,
+                ...photosFor(0, 1),
+              }),
+            }];
+            console.log(`matrix=${JSON.stringify({ include })}`);
+            console.log(`session=${edit.session_id}`);
+            console.log('count=1');
+            console.log(`has_source=${hasSource}`);
+            console.log(`source_path=${hasSource ? edit.source_path : ''}`);
+            console.log(`has_frames=${frames.length > 0}`);
+            console.log(`frames=${JSON.stringify(frames)}`);
+            console.log(`video_path=${edit.storage_path || ''}`);
+            process.exit(0);
+          }
+
+          const plans = await call('kb_plans_ready', { p_session_id: (process.env.SESSION_ID || '').trim() || null });
+          if (!plans.length) {
+            throw new Error('No completed plan found. Lock every slot on the Plan page first.');
+          }
+          const plan = plans[0];
+
+          let slots = (plan.slots || []).map((s, i) => ({ ...s, slot: i + 1 }));
+          /* A list, not a single number. Re-rendering a slot that already has a
+           * video costs a full agent run and overwrites the file, so "render
+           * the ones I have not done yet" has to be expressible. */
+          const only = (process.env.ONLY || '').trim();
+          if (only) {
+            const wanted = only.split(',').map((p) => parseInt(p.trim(), 10));
+            const bad = wanted.filter((n) => !Number.isInteger(n) || n < 1 || n > slots.length);
+            if (bad.length) {
+              throw new Error(`only=${only}: ${bad.join(', ')} out of range; this plan has ${slots.length} videos`);
+            }
+            slots = [...new Set(wanted)].map((n) => slots[n - 1]);
+          }
+
+          /* The locked slot goes to the pipeline as fields, not flattened into
+           * one string. The Script stage needs the hook on its own so it can be
+           * beat 1 word for word; flattened, it was one line among many and
+           * every script in the first batch replaced it. `brief` is a JSON
+           * string because it is written into the pipeline script as-is;
+           * `topic` is the plain title, for job names and the render record. */
+          const include = slots.map((s, i) => ({
+            slot: s.slot,
+            name: nameOf(s.topic),
+            topic: text(s.topic),
+            brief: JSON.stringify({
+              topic: text(s.topic),
+              goal: text(plan.goal),
+              angle: text(s.angle),
+              hook: text(s.hook) || text(s.opening_line),
+              evidence: text(s.evidence),
+              product: text(s.product),
+              audience: text(s.audience),
+              source_ids: (s.source_ids || []).filter((x) => typeof x === 'string' && x.trim()),
+              ...photosFor(i, slots.length),
+            }),
+          }));
+
+          console.log(`matrix=${JSON.stringify({ include })}`);
+          console.log(`session=${plan.session_id}`);
+          console.log(`count=${include.length}`);
+          console.log('has_source=false');
+          console.log('source_path=');
+          console.log('has_frames=false');
+          console.log('frames=[]');
+          console.log('video_path=');
+          EOF
+
+      # The source of the video being edited, fetched here because this job
+      # holds the service-role key and the render job must not. Only the file
+      # crosses over.
+      - name: Fetch the source of the video being edited
+        if: ${{ steps.build.outputs.has_source == 'true' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SOURCE_PATH: ${{ steps.build.outputs.source_path }}
+        run: |
+          set -euo pipefail
+          mkdir -p edit-source
+          curl -sS --fail-with-body --retry 4 --retry-delay 8 --retry-connrefused \
+            "${SUPABASE_URL%/}/storage/v1/object/video-sources/$SOURCE_PATH" \
+            -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -o edit-source/source.tar.gz
+          ls -la edit-source/
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ steps.build.outputs.has_source == 'true' }}
+        with:
+          name: edit-source
+          path: edit-source/
+          retention-days: 3
+
+      # The moments the reviewer's notes point at, cut from the stored video as
+      # images, so the agent sees exactly the frame a note is about. A frame
+      # that can't be cut costs that picture, not the edit: the note's text
+      # still says where to look.
+      - name: Grab the frames the notes point at
+        if: ${{ steps.build.outputs.has_frames == 'true' }}
+        continue-on-error: true
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          VIDEO_PATH: ${{ steps.build.outputs.video_path }}
+          FRAMES: ${{ steps.build.outputs.frames }}
+        run: |
+          set -uo pipefail
+          command -v ffmpeg >/dev/null || { sudo apt-get update && sudo apt-get install -y ffmpeg; }
+          mkdir -p edit-frames
+          curl -sS --fail-with-body --retry 4 --retry-delay 8 --retry-connrefused \
+            "${SUPABASE_URL%/}/storage/v1/object/videos/$VIDEO_PATH" \
+            -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -o /tmp/video.mp4
+          printf '%s' "$FRAMES" | jq -c '.[]' | while read -r f; do
+            file=$(printf '%s' "$f" | jq -r .file)
+            at=$(printf '%s' "$f" | jq -r .at)
+            ffmpeg -nostdin -hide_banner -loglevel error -y -ss "$at" -i /tmp/video.mp4 \
+              -frames:v 1 -q:v 3 -vf scale=720:-2 "edit-frames/$file" \
+              || echo "::warning::Could not cut the frame at ${at}s."
+          done
+          ls -la edit-frames/
+
+      - uses: actions/upload-artifact@v4
+        if: ${{ steps.build.outputs.has_frames == 'true' }}
+        with:
+          name: edit-frames
+          path: edit-frames/
+          retention-days: 3
+          if-no-files-found: ignore
+
+      # A plan that fails after claiming an edit would leave the Output page
+      # showing it as editing until it went stale. Say it failed instead,
+      # retrying through the same kind of API timeout that may have stopped
+      # the plan (recording an edit's outcome twice changes nothing). If even
+      # that fails, say so loudly instead of leaving the edit stuck unseen.
+      - name: Record an edit that could not start
+        if: ${{ failure() && inputs.edit_id != '' }}
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EDIT_ID: ${{ inputs.edit_id }}
+        run: |
+          if ! curl -sS --fail-with-body --retry 4 --retry-delay 8 --retry-connrefused \
+               -X POST "${SUPABASE_URL%/}/rest/v1/rpc/kb_video_edit_finish" \
+               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+               -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+               -H 'content-type: application/json' \
+               -d "$(jq -n --arg e "$EDIT_ID" '{p_edit_id: $e, p_status: "failed", p_error: "the edit could not start; see the run"}')" \
+               > /dev/null; then
+            echo "::error::Could not record edit $EDIT_ID as failed, so the Output page will keep showing it as editing. To clear it, run this in the Supabase SQL editor: select public.kb_video_edit_finish('$EDIT_ID', 'failed', 'the edit could not start; see the run');"
+            exit 1
+          fi
+
+  render:
+    name: Render ${{ matrix.slot }} — ${{ matrix.name }}
+    needs: plan
+    runs-on: ubuntu-latest
+    timeout-minutes: 90
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    # No Supabase secret anywhere in this job. The agent below has a shell (and
+    # sudo, on a hosted runner) while reading pages from the open web, so
+    # anything this job holds, it can reach. Storage is the next job's work.
+    steps:
+      # By default checkout leaves the job's GitHub token in .git/config, where
+      # the agent's shell could read it.
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.11'
+
+      # Remotion brings its own headless Chrome, but not ffmpeg, and the
+      # Voiceover stage muxes narration onto the render with it.
+      - name: Install ffmpeg
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg
+
+      - name: Install dependencies
+        run: |
+          npm --prefix video/remotion ci || npm --prefix video/remotion install --no-audit --no-fund
+          pip install -r video/requirements.txt
+
+      # The pipeline is driven through Claude Code's Workflow tool, so the CLI
+      # is the runtime here, not a helper.
+      - name: Install Claude Code
+        run: npm install -g @anthropic-ai/claude-code
+
+      # An edit of a video whose source was kept: put the source back where
+      # the pipeline left it, so the agent edits the real thing rather than a
+      # lookalike.
+      - uses: actions/download-artifact@v4
+        if: ${{ matrix.has_source }}
+        with:
+          name: edit-source
+          path: /tmp/edit-source
+
+      - name: Restore the video's source
+        if: ${{ matrix.has_source }}
+        run: |
+          tar -xzf /tmp/edit-source/source.tar.gz -C video/remotion
+          cat video/remotion/.edit/manifest.json
+
+      # The frames the notes point at, where the notes say they are. After the
+      # source, because the source unpacks its own .edit folder.
+      - uses: actions/download-artifact@v4
+        if: ${{ matrix.has_frames }}
+        continue-on-error: true
+        with:
+          name: edit-frames
+          path: video/remotion/.edit/frames
+
+      - name: Render video ${{ matrix.slot }} — ${{ matrix.name }}
+        env:
+          # The repo secret is named ANTHROPIC_API; the CLI reads ANTHROPIC_API_KEY.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+          ELEVENLABS_API_KEY: ${{ secrets.ELEVENLABS_API_KEY }}
+          BRIEF_JSON: ${{ matrix.brief }}
+          MAX_TURNS: ${{ inputs.max_turns }}
+          # Only set on an edit. Read by video/edit-prompt.mjs, and never put
+          # through the shell.
+          EDIT_INSTRUCTION: ${{ matrix.instruction }}
+          HAS_SOURCE: ${{ matrix.has_source }}
+          # Narration lines rewritten on the Edit page's script panel, as JSON.
+          # Read by video/edit-prompt.mjs, like the instruction.
+          SCRIPT_CHANGES: ${{ matrix.script_changes }}
+          # The Workflow tool returns immediately with a task id and runs in the
+          # background, so the agent has nothing to block on and says it will
+          # report back later. Claude Code then waits 600s for background work
+          # and terminates it — which is exactly what happened: the pipeline was
+          # rendering happily and was killed at ten minutes.
+          #
+          # 0 waits indefinitely. The bound that matters is the job's own
+          # timeout-minutes, which is a real deadline rather than one that
+          # silently truncates a working render.
+          CLAUDE_CODE_PRINT_BG_WAIT_CEILING_MS: '0'
+        run: |
+          set -o pipefail
+          # A marker to date agent-written files against. `-newer package.json`
+          # matched every file in the repo, because checkout stamps them all at
+          # the same moment — so the artifact was fifteen pre-existing sources
+          # around a 208-byte log.
+          touch /tmp/render-start
+
+          # The brief is written into a copy of the pipeline script as a
+          # literal, rather than handed over as Workflow args. Args are typed
+          # out by the model driving the run: in the first batch it passed
+          # slot 1's brief as an object, and the Research stage was asked to
+          # research "[object Object]". Here nothing the model writes stands
+          # between the locked plan and the pipeline.
+          node - <<'EOF'
+          const fs = require('fs');
+          const bake = (src, token, value) => {
+            if (src.split(token).length !== 2) throw new Error(`expected exactly one ${token} in pipeline_workflow.mjs`);
+            return src.replace(token, () => JSON.stringify(value));
+          };
+          let src = fs.readFileSync('video/remotion/pipeline_workflow.mjs', 'utf8');
+          src = bake(src, '/*@BRIEF@*/ null', JSON.parse(process.env.BRIEF_JSON));
+          src = bake(src, '/*@ROOT@*/ null', `${process.env.GITHUB_WORKSPACE}/video`);
+          fs.mkdirSync('video/remotion/.run', { recursive: true });
+          fs.writeFileSync('video/remotion/.run/pipeline.mjs', src);
+          EOF
+
+          # A headless run has no terminal to answer a permission prompt on, so
+          # the tools the pipeline needs are granted explicitly and by name. An
+          # allowlist rather than a blanket bypass: it is auditable here, and
+          # anything the pipeline was not built to reach is still refused.
+          #
+          # WebSearch is on the list because the Research stage is told to
+          # web-search. Without it that agent cannot look anything up, and the
+          # failure is the quiet kind: rather than stopping, it falls back on
+          # what it already knows and produces facts whose citations nobody
+          # can check.
+          #
+          # stream-json, not text. In text mode the CLI prints its result
+          # once, at the end, so for the whole run the log stays empty and then
+          # everything lands at once. Combined with GitHub only publishing a
+          # step's log when the step finishes, an unattended render was a black
+          # box with a spinner on it.
+          #
+          # The raw stream goes to render.log for the artifact; a readable
+          # digest goes to stdout. jq may fail without taking the step with it;
+          # pass or fail is decided at the end of this step by what was produced,
+          # not by any exit status in this pipe.
+          #
+          # --model sonnet, fixed. Every stage is an agent() call with no model of
+          # its own and inherits it. Measured on one full video each: opus $6.19,
+          # sonnet $3.46, haiku $1.47 but visibly rougher (a blank scene, plainer
+          # layouts). Sonnet chosen 2026-09-13.
+          #
+          # An edit whose source was restored gets its own prompt and fewer
+          # tools: no Workflow or Agent, and no web. The change request was
+          # typed into an open form, and an edit needs nothing beyond the files
+          # already here. An edit without a source runs the pipeline like a
+          # render, with the change in its brief.
+          if [ "$HAS_SOURCE" = "true" ]; then
+            TOOLS="Bash,Read,Write,Edit,Glob,Grep"
+            node video/edit-prompt.mjs > /tmp/prompt.txt
+          else
+            TOOLS="Bash,Read,Write,Edit,Glob,Grep,Workflow,Agent,WebFetch,WebSearch"
+            cat > /tmp/prompt.txt <<'EOF'
+          Run the video pipeline for one brief.
+
+          Use the Workflow tool exactly once, with no args:
+
+            Workflow({ scriptPath: 'video/remotion/.run/pipeline.mjs' })
+
+          The brief and the project location are already written into that
+          script. Do not pass args and do not edit the script. When it
+          finishes, print the absolute path of the finished mp4 on its own line
+          and nothing else. If it fails, print the error and stop.
+          EOF
+          fi
+
+          set +e
+          claude -p \
+            --allowedTools "$TOOLS" \
+            --model sonnet --max-turns "$MAX_TURNS" \
+            --output-format stream-json --verbose \
+            "$(cat /tmp/prompt.txt)" \
+            2>&1 | tee render.log | { jq -r --unbuffered '
+              if .type == "assistant" then
+                (.message.content // [])[]
+                | if .type == "text" then (.text // "")[0:400]
+                  elif .type == "tool_use" then "  -> " + (.name // "tool")
+                  else empty end
+              elif .type == "result" then
+                "=== " + (.subtype // "done") + " in " + (((.duration_ms // 0) / 1000) | floor | tostring) + "s ==="
+              else empty end' 2>/dev/null || cat; }
+          status=${PIPESTATUS[0]}
+          set -e
+
+          # Pass or fail on the thing this job exists to make: a narrated video.
+          # Not on how the agent's last turn went. One run went green having
+          # produced nothing, killed at 600s with exit 0; a later one went red
+          # because the closing "here is the path" turn hit a credit error after
+          # the files existed. Both verdicts were about the wrong thing.
+          OUT_state=; OUT_path=; OUT_mean_db=
+          while IFS='=' read -r k v; do
+            case "$k" in state) OUT_state=$v ;; path) OUT_path=$v ;; mean_db) OUT_mean_db=$v ;; esac
+          done < <(bash video/find-output.sh)
+
+          case "$OUT_state" in
+            ok)
+              if [ "$status" -ne 0 ]; then
+                echo "::warning::claude exited $status after the narrated video was made. The video is fine; the agent's closing turn was not. See render.log."
+              fi
+              echo "Finished: $OUT_path (mean ${OUT_mean_db} dB)"
+              exit 0 ;;
+            silent)
+              echo "::error::$OUT_path exists but its audio is silent (mean ${OUT_mean_db:-n/a} dB); the narration did not make it into the mux."
+              exit 1 ;;
+            unnarrated)
+              echo "::error::Only an unnarrated render exists ($OUT_path). The Voiceover stage did not finish (claude exit $status). See render.log."
+              exit 1 ;;
+            *)
+              echo "::error::No video was produced (claude exit $status). See render.log."
+              exit 1 ;;
+          esac
+
+      # The Assembly stage runs the brand check and fixes what it finds before
+      # rendering. It runs again here so anything that slipped through shows
+      # as a warning on the run, next to the video it's about. It checks the
+      # brand's rules, never a scene's layout.
+      - name: Brand check
+        if: always()
+        run: |
+          files=$(find video/remotion/src -maxdepth 1 -name '*.tsx' ! -name 'Root.tsx' -newer /tmp/render-start 2>/dev/null || true)
+          if [ -z "$files" ]; then echo "No new video component to check."; exit 0; fi
+          for f in $files; do
+            if out=$(node video/remotion/brand-lint.mjs "$f"); then
+              # Notes pass the check: text a little outside the safe zone,
+              # allowed where a scene needs the room. Shown, not failed.
+              echo "$out" | sed '/: note: /s/^/::notice::/'
+            else
+              echo "$out" | grep -v '^$' | sed 's/^/::warning::/'
+            fi
+          done
+
+      # The frame check looks at a finished frame of every scene, fixes what it
+      # can and writes down anything still overlapping or cut off. Those show
+      # as warnings on the run, next to the video they're about.
+      - name: Frame check
+        if: always()
+        run: |
+          report=video/remotion/out/frame-check.txt
+          if [ ! -f "$report" ]; then echo "No frame check was written."; exit 0; fi
+          if ! grep -q '[^[:space:]]' "$report"; then echo "Frame check passed."; exit 0; fi
+          grep '[^[:space:]]' "$report" | head -n 20 | cut -c1-300 | sed 's/^/::warning::Frame check: /'
+
+      # always(): a failed render's log is the only way to learn why, and it is
+      # exactly what you want when nobody watched it happen.
+      - name: Collect output
+        if: always()
+        run: |
+          mkdir -p artifact
+          cp render.log artifact/ 2>/dev/null || true
+          cp video/remotion/.run/pipeline.mjs artifact/pipeline-as-run.mjs 2>/dev/null || true
+          cp video/remotion/out/frame-check.txt artifact/ 2>/dev/null || true
+          mkdir -p artifact/frame-check && cp video/remotion/out/frame-check/*.jpg artifact/frame-check/ 2>/dev/null || true
+          find video/remotion/out -name '*.mp4' -exec cp {} artifact/ \; 2>/dev/null || true
+          find video/remotion -maxdepth 1 -name 'voiceover_*.py' -newer /tmp/render-start -exec cp {} artifact/ \; 2>/dev/null || true
+          find video/remotion/src -maxdepth 1 -name '*.tsx' -newer /tmp/render-start -exec cp {} artifact/ \; 2>/dev/null || true
+          # A pronunciation fix the edit made. The pronunciations job checks it
+          # and commits it, so every later video says the word right too.
+          git diff --quiet -- video/remotion/pronunciations.json || cp video/remotion/pronunciations.json artifact/pronunciations.json
+          # Everything needed to edit this video later. The store job keeps it
+          # in the private video-sources bucket.
+          bash video/pack-source.sh video/remotion "$PWD/artifact/source.tar.gz" || true
+          echo "--- artifact contents ---"; ls -la artifact/
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: video-${{ matrix.slot }}-${{ matrix.name }}
+          path: artifact/
+          retention-days: 14
+          if-no-files-found: warn
+
+  # Storage is what makes a render survive. The artifact expires in fourteen
+  # days and re-rendering is not a recovery path — the Assembly agent writes a
+  # fresh component every run, so the same brief does not give back the same
+  # video.
+  #
+  # A job of its own, on a clean runner, because this is where the service-role
+  # key lives. It used to be a step after the agent on the render runner, where
+  # a prompt-injected agent could have rewritten find-output.sh, or put its own
+  # curl on PATH, and been handed the key when this ran. Only the artifact
+  # crosses over, and nothing in it is executed.
+  #
+  # !cancelled() rather than success(): a failed render is worth a row too.
+  # "Slot 2 failed at 04:12, here is the run" is the question you ask later,
+  # and without the row there is nothing to ask it of.
+  store:
+    name: Store ${{ matrix.slot }} — ${{ matrix.name }}
+    needs: [plan, render]
+    if: ${{ !cancelled() && needs.plan.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+          sparse-checkout: video
+
+      - name: Install ffmpeg
+        run: command -v ffmpeg >/dev/null || { sudo apt-get update && sudo apt-get install -y ffmpeg; }
+
+      # A render that died before collecting anything leaves no artifact. That
+      # is a failed row to write, not a reason to skip writing one.
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          name: video-${{ matrix.slot }}-${{ matrix.name }}
+          path: artifact
+
+      - name: Store the video
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          SESSION_ID: ${{ needs.plan.outputs.session }}
+          SLOT: ${{ matrix.slot }}
+          NAME: ${{ matrix.name }}
+          TOPIC: ${{ matrix.topic }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+          EDIT_ID: ${{ matrix.edit_id }}
+          EDIT_OF: ${{ matrix.edit_of }}
+        run: |
+          set -euo pipefail
+          BASE="${SUPABASE_URL%/}"
+          mkdir -p artifact
+
+          # --fail-with-body on every call. Without it curl exits 0 on a 4xx or
+          # 5xx: a rejected upload was followed by a row saying "rendered", and
+          # a rejected row was not noticed at all.
+          # RETRY on every call that is safe to repeat (uploads upsert, and an
+          # edit's outcome is only recorded once), to ride out the few-second
+          # API timeouts Supabase sometimes has: curl tries again after no
+          # connection, a timeout, 408, 429, 500, 502, 503 or 504.
+          RETRY=(--retry 4 --retry-delay 8 --retry-connrefused)
+
+          # Prints the new row's id; kb_record_render returns it as a JSON string.
+          # It adds a row, so it is not repeated after a 504 or a 500, which
+          # may have gone through; only when it surely never ran: no
+          # connection (curl 6 or 7), 429, 502 or 503.
+          record() {
+            local out rc code try
+            out=$(mktemp)
+            for try in 1 2 3 4; do
+              rc=0
+              code=$(curl -sS -o "$out" -w '%{http_code}' -X POST "$BASE/rest/v1/rpc/kb_record_render" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H 'content-type: application/json' \
+                -d "$1") || rc=$?
+              if [ "$rc" = 0 ] && [ "${code:0:1}" = 2 ]; then
+                # An answer jq can't read is a failure, not an empty id.
+                jq -r . < "$out" && rc=0 || rc=$?
+                rm -f "$out"
+                return "$rc"
+              fi
+              case "$rc:$code" in
+                6:*|7:*|0:429|0:502|0:503)
+                  if [ "$try" -lt 4 ]; then
+                    echo "kb_record_render: no luck (curl $rc, HTTP $code); trying again in $((try * 8))s" >&2
+                    sleep $((try * 8))
+                    continue
+                  fi ;;
+              esac
+              break
+            done
+            echo "::error::kb_record_render failed (curl $rc, HTTP $code): $(head -c 300 "$out" | tr '\n' ' ')" >&2
+            rm -f "$out"
+            return 1
+          }
+          # An edit's own row says how it ended, so the Output page can show it.
+          # Losing that costs the status line, not the video, so it only warns.
+          finish_edit() {
+            [ -n "${EDIT_ID:-}" ] || return 0
+            curl -sS --fail-with-body "${RETRY[@]}" -X POST "$BASE/rest/v1/rpc/kb_video_edit_finish" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H 'content-type: application/json' \
+              -d "$(jq -n --arg e "$EDIT_ID" --arg s "$1" --arg w "${2:-}" --arg r "${3:-}" \
+                '{p_edit_id: $e, p_status: $s,
+                  p_error: (if $w == "" then null else $w end),
+                  p_result_render_id: (if $r == "" then null else $r end)}')" \
+              > /dev/null || echo "::warning::Could not record how the edit ended."
+          }
+          record_failed() {
+            record "$(jq -n --arg s "$SESSION_ID" --argjson n "$SLOT" --arg t "$TOPIC" --arg r "$RUN_URL" --arg w "$1" \
+              '{payload:{brand_slug:"trilith",session_id:$s,slot:$n,topic:$t,status:"failed",error:$w,run_url:$r}}')" > /dev/null
+            finish_edit failed "$1"
+            echo "### Slot $SLOT — not stored: $1" >> "$GITHUB_STEP_SUMMARY"
+          }
+          # The agent's last words in render.log, for an edit that made no
+          # video. The agent wrote that log, so this is only ever text: one
+          # line, at most 300 characters, passed on through jq --arg.
+          said() {
+            node -e '
+              const fs = require("fs");
+              let last = "";
+              try {
+                for (const line of fs.readFileSync(process.argv[1], "utf8").split("\n")) {
+                  let m;
+                  try { m = JSON.parse(line); } catch { continue; }
+                  if (!m || m.type !== "result") continue;
+                  last = typeof m.result === "string" && m.result.trim() ? m.result
+                    : m.subtype && m.subtype !== "success" ? "it stopped early (" + m.subtype + ")" : "";
+                }
+              } catch { /* no log, so nothing to say */ }
+              process.stdout.write(last.replace(/\s+/g, " ").trim().slice(0, 300));
+            ' artifact/render.log 2>/dev/null || true
+          }
+
+          # The same judgement the render step made, by the same script, on the
+          # same files. This used to store the first mp4 find returned: slot 1
+          # reached the bucket without its narration, and slots 2 and 3 were
+          # recorded as rendered although their Voiceover stage never ran.
+          OUT_state=; OUT_path=; OUT_mean_db=
+          while IFS='=' read -r k v; do
+            case "$k" in state) OUT_state=$v ;; path) OUT_path=$v ;; mean_db) OUT_mean_db=$v ;; esac
+          done < <(bash video/find-output.sh artifact)
+
+          if [ "$OUT_state" != "ok" ]; then
+            case "$OUT_state" in
+              unnarrated) WHY="voiceover stage did not finish; only an unnarrated render exists" ;;
+              silent)     WHY="narrated file is silent (mean ${OUT_mean_db:-n/a} dB)" ;;
+              *)          WHY="render produced no mp4" ;;
+            esac
+            # An edit that can't be made is told to say why and stop, and
+            # render.log is the only place that reason exists. It goes on the
+            # edit, where the Edit and Output pages show it.
+            if [ -n "${EDIT_ID:-}" ]; then
+              SAID=$(said)
+              if [ -n "$SAID" ]; then WHY="$WHY. Claude said: ${SAID%.}"; fi
+            fi
+            # Not uploaded. An unnarrated render is not the deliverable, and under
+            # the canonical path it would read as one. It stays in the artifact.
+            echo "Not storing: $WHY"
+            record_failed "$WHY"
+            exit 0
+          fi
+          MP4="$OUT_path"
+
+          # An edit is a new version, so it gets its own file and the version it
+          # replaces stays playable. A render keeps the canonical path.
+          if [ -n "${EDIT_ID:-}" ]; then
+            PATH_IN_BUCKET="$SESSION_ID/$SLOT-$NAME-edit-$GITHUB_RUN_ID.mp4"
+          else
+            PATH_IN_BUCKET="$SESSION_ID/$SLOT-$NAME.mp4"
+          fi
+          BYTES=$(wc -c < "$MP4" | tr -d ' ')
+          DUR=$(ffprobe -v error -show_entries format=duration -of csv=p=0 "$MP4" 2>/dev/null || echo "")
+
+          echo "Uploading $MP4 ($BYTES bytes) -> videos/$PATH_IN_BUCKET"
+          if ! UPLOAD=$(curl -sS --fail-with-body "${RETRY[@]}" -X POST "$BASE/storage/v1/object/videos/$PATH_IN_BUCKET" \
+                -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H 'content-type: video/mp4' \
+                -H 'x-upsert: true' \
+                --data-binary "@$MP4" 2>&1); then
+            # One line: it becomes a summary heading and a database field.
+            UPLOAD=$(printf '%s' "$UPLOAD" | tr '\n' ' ')
+            echo "::error::Upload to storage failed: ${UPLOAD:0:500}"
+            record_failed "upload to storage failed: ${UPLOAD:0:300}"
+            exit 1
+          fi
+
+          # The source goes to its own private bucket. Without it the video can
+          # still be watched, only not edited exactly, so a failure only warns.
+          SOURCE_PATH=""
+          if [ -s artifact/source.tar.gz ]; then
+            SRC_KEY="$SESSION_ID/$SLOT-$NAME-$GITHUB_RUN_ID.tar.gz"
+            if curl -sS --fail-with-body "${RETRY[@]}" -X POST "$BASE/storage/v1/object/video-sources/$SRC_KEY" \
+                 -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                 -H 'content-type: application/gzip' \
+                 -H 'x-upsert: true' \
+                 --data-binary @artifact/source.tar.gz > /dev/null; then
+              SOURCE_PATH="$SRC_KEY"
+            else
+              echo "::warning::Could not keep this video's source. It can still be re-made with a change, but not edited exactly."
+            fi
+          fi
+
+          # The narration lines, for the Edit page's script panel, whose line
+          # edits need the kept source. video/script-lines.py reads LINES from
+          # the voiceover script in the bundle; it parses that file, never runs it.
+          SCRIPT_JSON=null
+          if [ -n "$SOURCE_PATH" ]; then
+            SCRIPT_JSON=$(python3 video/script-lines.py artifact/source.tar.gz 2>/dev/null) || SCRIPT_JSON=null
+            printf '%s' "$SCRIPT_JSON" | jq -e 'type == "array"' > /dev/null 2>&1 || SCRIPT_JSON=null
+          fi
+
+          # The library photos the scenes show, in the order the scene file
+          # names them, so the next render can leave out the ones used
+          # recently (kb_recent_photos). Read from the scene files this run
+          # wrote, which are in the artifact.
+          PHOTOS_JSON=$(grep -ohE 'library/[A-Za-z0-9._-]+\.jpg' artifact/*.tsx 2>/dev/null \
+            | sed 's#^library/##' | awk '!seen[$0]++' | jq -R . | jq -sc .) || PHOTOS_JSON='[]'
+          printf '%s' "$PHOTOS_JSON" | jq -e 'type == "array"' > /dev/null 2>&1 || PHOTOS_JSON='[]'
+
+          NEW_ID=$(record "$(jq -n --arg s "$SESSION_ID" --argjson n "$SLOT" --arg t "$TOPIC" \
+            --arg p "$PATH_IN_BUCKET" --argjson b "$BYTES" --arg d "${DUR:-0}" --arg r "$RUN_URL" \
+            --arg f "$(basename "$MP4")" --arg m "${OUT_mean_db:-}" --argjson photos "$PHOTOS_JSON" \
+            --arg src "$SOURCE_PATH" --arg ei "${EDIT_ID:-}" --arg eo "${EDIT_OF:-}" --argjson script "$SCRIPT_JSON" \
+            '{payload:{brand_slug:"trilith",session_id:$s,slot:$n,topic:$t,
+                       storage_path:$p,bytes:$b,duration_seconds:($d|tonumber),
+                       status:"rendered",run_url:$r,
+                       metadata:({source_file:$f,mean_volume_db:$m}
+                         + (if $src != "" then {source_path:$src} else {} end)
+                         + (if $script != null then {script:$script} else {} end)
+                         + (if ($photos | length) > 0 then {photos:$photos} else {} end)
+                         + (if $ei != "" then {edit_id:$ei,edit_of:$eo} else {} end))}}')")
+          finish_edit done "" "$NEW_ID"
+
+          # A signed link in the job summary, so reviewing is a click rather than
+          # a download. The bucket is private; this is the only way in. A failure
+          # here costs the link, not the video, so it does not fail the step.
+          SIGNED=$(curl -sS --fail-with-body "${RETRY[@]}" -X POST "$BASE/storage/v1/object/sign/videos/$PATH_IN_BUCKET" \
+            -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H 'content-type: application/json' \
+            -d '{"expiresIn": 2592000}' | jq -r '.signedURL // empty') || SIGNED=""
+
+          {
+            echo "### Slot $SLOT — $NAME"
+            echo ""
+            echo "- **Size:** $(( BYTES / 1024 )) KB"
+            echo "- **Narration:** mean ${OUT_mean_db:-n/a} dB, from $(basename "$MP4")"
+            [ -n "$DUR" ] && echo "- **Duration:** ${DUR}s"
+            echo "- **Stored:** \`videos/$PATH_IN_BUCKET\`"
+            echo "- **Source kept:** ${SOURCE_PATH:-no, so it can only be re-made, not edited exactly}"
+            [ -n "$SIGNED" ] && echo "- **Watch (30-day link):** ${BASE}/storage/v1${SIGNED}"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # An edit run that ends without recording how the edit went leaves the pages
+  # showing the video as editing for 3 hours, then dropping it without a word.
+  # A run cancelled in GitHub does that: it skips the plan job's failure step
+  # and the store job. So this runs last, whatever happened, and marks the
+  # edit failed if it is still open. After a normal finish it changes nothing,
+  # because kb_video_edit_finish only touches an edit that is queued or
+  # running. (A run GitHub refuses to start never gets here; the Worker
+  # records that one.)
+  close-edit:
+    name: Close the edit
+    needs: [plan, render, store]
+    if: ${{ always() && inputs.edit_id != '' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Mark the edit failed if nothing recorded how it ended
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          EDIT_ID: ${{ inputs.edit_id }}
+          HOW: ${{ (needs.plan.result == 'cancelled' || needs.render.result == 'cancelled' || needs.store.result == 'cancelled') && 'the edit was cancelled before it finished' || 'the run ended without recording how the edit went; see the run' }}
+        run: |
+          if ! curl -sS --fail-with-body --retry 4 --retry-delay 8 --retry-connrefused \
+               -X POST "${SUPABASE_URL%/}/rest/v1/rpc/kb_video_edit_finish" \
+               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+               -H "authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+               -H 'content-type: application/json' \
+               -d "$(jq -n --arg e "$EDIT_ID" --arg w "$HOW" '{p_edit_id: $e, p_status: "failed", p_error: $w}')" \
+               > /dev/null; then
+            echo "::error::Could not close edit $EDIT_ID, so the Output page may keep showing it as editing. To clear it, run this in the Supabase SQL editor: select public.kb_video_edit_finish('$EDIT_ID', 'failed', 'the edit stopped before it finished');"
+            exit 1
+          fi
+
+  # A pronunciation fix made in an edit goes into the shared list in the repo,
+  # so the word is said right in every video after it, not just this one.
+  # A job of its own, on a clean runner with no agent, because it is the only
+  # one that can write to the repo: the edit agent took a request typed into
+  # the app, so its copy of the list arrives as data and pronunciations-merge.py
+  # takes only entries shaped like a word and how to say it.
+  pronunciations:
+    name: Keep pronunciation fixes
+    needs: [plan, render]
+    if: ${{ !cancelled() && inputs.edit_id != '' && needs.render.result == 'success' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: video-*
+          path: /tmp/runs
+
+      - name: Commit and push
+        run: |
+          shopt -s nullglob
+          lists=(/tmp/runs/*/pronunciations.json)
+          if [ ${#lists[@]} -eq 0 ]; then
+            echo "This edit changed no pronunciations."
+            exit 0
+          fi
+          python3 video/pronunciations-merge.py video/remotion/pronunciations.json "${lists[@]}"
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add video/remotion/pronunciations.json
+          if git diff --staged --quiet; then
+            echo "Nothing new to keep."
+            exit 0
+          fi
+          git commit -m "Pronunciation fix from edit ${{ inputs.edit_id }}"
+          # Another commit may land while the edit runs. Rebase onto it and retry,
+          # as the daily ad pull does.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            git pull --rebase --autostash origin main || {
+              echo "::error::Rebase failed; the fix was used in this edit but not kept."
+              exit 1
+            }
+          done
+          echo "::error::Could not push after 3 attempts; the fix was used in this edit but not kept."
+          exit 1

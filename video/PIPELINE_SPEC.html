@@ -1,0 +1,407 @@
+<title>Video Pipeline Spec</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Sans:wght@400;500;600&family=IBM+Plex+Mono:wght@500&display=swap');
+
+  :root {
+    --bg: #f6f5f1;
+    --surface: #ffffff;
+    --ink: #1c1d1a;
+    --muted: #6b6a62;
+    --accent: #a1472e;
+    --accent-soft: #f0e2dc;
+    --border: #ddd9cd;
+    --code-bg: #efece2;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root:not([data-theme="light"]) {
+      --bg: #17171400;
+      --bg: #16150f;
+      --surface: #201f18;
+      --ink: #ece8dd;
+      --muted: #a29d8c;
+      --accent: #e08862;
+      --accent-soft: #3a2620;
+      --border: #3a382c;
+      --code-bg: #262419;
+    }
+  }
+
+  :root[data-theme="dark"] {
+    --bg: #16150f;
+    --surface: #201f18;
+    --ink: #ece8dd;
+    --muted: #a29d8c;
+    --accent: #e08862;
+    --accent-soft: #3a2620;
+    --border: #3a382c;
+    --code-bg: #262419;
+  }
+
+  * { box-sizing: border-box; }
+
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--ink);
+    font-family: "IBM Plex Sans", system-ui, sans-serif;
+    font-size: 16.5px;
+    line-height: 1.65;
+  }
+
+  .page { max-width: 820px; margin: 0 auto; padding: 60px 28px 110px; }
+
+  .kicker {
+    font-family: "IBM Plex Mono", ui-monospace, monospace;
+    font-size: 12px;
+    letter-spacing: 0.12em;
+    text-transform: uppercase;
+    color: var(--accent);
+  }
+
+  h1 {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 700;
+    font-size: clamp(2rem, 5vw, 2.7rem);
+    margin: 8px 0 14px;
+    line-height: 1.08;
+    text-wrap: balance;
+  }
+
+  .lede { color: var(--muted); font-size: 1.05rem; max-width: 68ch; margin: 0 0 44px; }
+  .lede strong { color: var(--ink); }
+
+  h2 {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 1.5rem;
+    margin: 52px 0 6px;
+    padding-top: 24px;
+    border-top: 1px solid var(--border);
+  }
+
+  h2:first-of-type { border-top: none; padding-top: 0; margin-top: 0; }
+
+  h2 .num {
+    font-family: "IBM Plex Mono", monospace;
+    color: var(--accent);
+    font-size: 0.9rem;
+    margin-right: 10px;
+  }
+
+  h3 {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 1.08rem;
+    margin: 26px 0 8px;
+  }
+
+  p { margin: 0 0 14px; }
+
+  .stage-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    margin: 6px 0 16px;
+  }
+
+  .pill {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.03em;
+    padding: 4px 10px;
+    border-radius: 999px;
+    border: 1px solid var(--border);
+    color: var(--muted);
+    background: var(--surface);
+  }
+
+  .pill.agent { color: var(--accent); border-color: color-mix(in srgb, var(--accent) 45%, var(--border)); }
+
+  code, .code-inline {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 0.88em;
+    background: var(--code-bg);
+    padding: 1px 6px;
+    border-radius: 4px;
+  }
+
+  ul, ol { padding-left: 22px; margin: 0 0 16px; }
+  li { margin-bottom: 6px; }
+
+  .callout {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-left: 3px solid var(--accent);
+    border-radius: 6px;
+    padding: 16px 20px;
+    margin: 18px 0;
+  }
+
+  .callout .label {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 10.5px;
+    letter-spacing: 0.1em;
+    text-transform: uppercase;
+    color: var(--accent);
+    display: block;
+    margin-bottom: 6px;
+  }
+
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    margin: 16px 0 20px;
+    font-size: 0.92rem;
+  }
+
+  th, td {
+    text-align: left;
+    padding: 9px 12px;
+    border-bottom: 1px solid var(--border);
+    vertical-align: top;
+  }
+
+  th {
+    font-family: "IBM Plex Mono", monospace;
+    font-size: 11px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    color: var(--muted);
+    font-weight: 500;
+  }
+
+  .tier-block {
+    background: var(--surface);
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 20px 24px;
+    margin: 16px 0;
+  }
+
+  .tier-title {
+    font-family: "Space Grotesk", sans-serif;
+    font-weight: 600;
+    font-size: 1.02rem;
+    margin-bottom: 4px;
+  }
+
+  .tier-title .cost {
+    font-family: "IBM Plex Mono", monospace;
+    font-weight: 500;
+    font-size: 0.75rem;
+    color: var(--muted);
+    margin-left: 8px;
+  }
+
+  .path { font-family: "IBM Plex Mono", monospace; font-size: 0.85em; color: var(--muted); }
+
+  footer { margin-top: 60px; padding-top: 20px; border-top: 1px solid var(--border); color: var(--muted); font-size: 0.92rem; }
+
+  @media (max-width: 560px) {
+    .page { padding: 44px 18px 80px; }
+    .tier-block, .callout { padding: 16px 18px; }
+  }
+</style>
+
+<div class="page">
+  <span class="kicker">Internal Spec — v1</span>
+  <h1>Topic-to-Video Pipeline</h1>
+  <p class="lede">
+    An automated pipeline that takes a <strong>topic</strong> as input and produces a finished,
+    voiced, vertical video — the same process used by hand for the Mayweather, JPMorgan, DSCR, and
+    construction-loan videos, now specified as a repeatable system. Orchestrated with the
+    <strong>Workflow tool</strong>: judgment-heavy steps run as agent calls, deterministic steps
+    (rendering, muxing, file checks) run as plain code between them.
+  </p>
+
+  <h2><span class="num">00</span>Input</h2>
+  <p>
+    <code>topic</code> (required) — a working title or short description, or a source URL/article
+    when the topic is tied to a specific piece (like a specific blog post). Optional:
+    <code>brandFlag</code> (whether to include client branding in the closer), target duration
+    range.
+  </p>
+
+  <h2><span class="num">01</span>Research &amp; Facts</h2>
+  <div class="stage-meta"><span class="pill agent">agent · web search/fetch</span></div>
+  <p>
+    Web-searches the topic, cross-checks 2–3 sources, extracts dated facts with citations. Flags
+    when hard numbers are missing (as the construction-loan article did) rather than inventing
+    them. Output shape matches the existing <span class="path">data/topics_*.json</span> format.
+  </p>
+
+  <h2><span class="num">02</span>Hook + Script</h2>
+  <div class="stage-meta"><span class="pill agent">agent</span> <span class="pill">reads hook_templates_1000.json</span> <span class="pill">+ JS enforcement</span></div>
+  <p>
+    <strong>When the brief has a locked opening line</strong> (every brief from the Plan page does),
+    that line is beat 1, word for word, and the library is not used. The agent is told so, and the
+    workflow script then puts the line in place itself: in the first batch, every script swapped
+    the locked hook for a library one.
+  </p>
+  <p>
+    Otherwise, selects a category and a specific template from the <strong>980-template hook library</strong>
+    (<span class="path">hook_templates_1000.json</span> — Educational, Storytelling, Authority,
+    Myth Busting, Comparison, Day in the Life, Random), then fills its <code>(insert X)</code>
+    placeholders with real facts from Stage 01. Example: "This represents your X before, during,
+    and after X" → "This represents your credit score before, during, and after a DSCR loan."
+  </p>
+  <p>
+    <strong>Written for complete beginners.</strong> Research also returns the topic's key terms with
+    plain-English meanings. The script explains each term the first time it's used, keeps to one idea
+    per beat, and builds to a single takeaway. A separate agent then hears only the narration, as
+    someone new to real estate investing would, and flags any unexplained term or confusing beat. The
+    script gets one revision against what it flags, then a second listen.
+  </p>
+  <p>
+    <strong>In The Buy Box's voice.</strong> The script stage carries the brand guide's personality,
+    voice and tone, with the guide's own "Say this / Not this" examples. The speaker is the person on the
+    other side of the underwriting desk: experienced, beginner friendly and confident about the math, never
+    superior, dumbed down or certain about the future. Scripts never mention Trilith or pitch a product,
+    and the last beat asks the viewer to follow The Buy Box. A lint flags hype, talking down, promises
+    about the future and a missing follow ask. Its notes go into the same single revision as the
+    beginner check.
+  </p>
+  <p>Writes the full 10–12 beat script (line + estSeconds per beat), same shape as <span class="path">data/script_*.json</span>.</p>
+
+  <h2><span class="num">03</span>Visual Plan</h2>
+  <div class="stage-meta"><span class="pill agent">agent</span> <span class="pill">+ JS validation</span></div>
+  <p>
+    Gives each beat <strong>its own visual idea</strong>: what is on screen and how it moves,
+    written for that line. There is no component library to pick from; scenes are designed from
+    scratch so the videos keep their variety. Each beat also gets a background (black, white,
+    concrete, or footage) and an accent: orange for the one thing to look at, green only for the
+    answer, or none. Beats needing a real video clip are flagged for Stage 04.
+  </p>
+  <div class="callout">
+    <span class="label">The Buy Box rules: enforced, not suggested</span>
+    Checked in code, and the plan is sent back with the reasons if it fails any of these:
+    <ul>
+      <li>No two beats in a row share a background.</li>
+      <li>Footage exactly where a beat needs an asset.</li>
+      <li>The closing frame sits on black or white.</li>
+      <li>At least one scene uses Site Orange.</li>
+    </ul>
+    Text size is a floor, not a tier: headlines at least 110px, nothing under 40px.
+  </div>
+
+  <h2><span class="num">04</span>Asset Search</h2>
+  <div class="stage-meta"><span class="pill agent">agent, per flagged beat</span></div>
+  <p>
+    Searches Pexels' <strong>video endpoint only</strong> — this is a hard rule, not a preference:
+    the search call itself is never allowed to hit the photo or GIF endpoints, so a static image
+    can't enter the candidate pool in the first place. Uses 2–3 keyword variations derived from
+    that beat's actual line (not one generic topic keyword). Returns 3–5 candidate clips per beat,
+    ranked by relevance guess, for Stage 05 to work through in order.
+  </p>
+
+  <h2><span class="num">05</span>Asset QA</h2>
+  <p>Two tiers, cheapest check first, so a bad candidate never reaches a model call it doesn't need.</p>
+
+  <div class="tier-block">
+    <div class="tier-title">Tier 1 — Format &amp; motion <span class="cost">deterministic, no model call</span></div>
+    <ul>
+      <li>Must be a video file. Any non-video candidate is rejected before this tier even runs (Stage 04 only queries video search).</li>
+      <li>Extract 3 frames via ffmpeg (start / mid / end). Compute a perceptual difference between them.</li>
+      <li>Near-identical frames → static/boring clip → <strong>auto-reject</strong>, no vision call spent.</li>
+    </ul>
+  </div>
+
+  <div class="tier-block">
+    <div class="tier-title">Tier 2 — Vision judgment <span class="cost">agent call on the 3 sampled frames</span></div>
+    <p>The agent receives the 3 frames, the beat's specific line (not the general topic), and the on-screen caption. Structured output:</p>
+    <table>
+      <tr><th>Field</th><th>Checks</th></tr>
+      <tr><td><code>relevant</code></td><td>Would a viewer immediately connect this footage to <em>this exact line</em>? Generic topic-adjacent stock (e.g. handshake footage for any finance beat) fails even if thematically nearby.</td></tr>
+      <tr><td><code>visuallyInteresting</code></td><td>Real composition and lighting, not the generic locked-off corporate-stock look; no dead space; no burned-in watermark or logo.</td></tr>
+      <tr><td><code>verticalCropOK</code></td><td>Would a 9:16 <em>cover</em> crop cut off or squeeze out the interesting content?</td></tr>
+    </table>
+    <p>
+      <code>relevant</code> and <code>visuallyInteresting</code> are the real pass/fail gate.
+      <code>verticalCropOK</code> is not — it routes the asset to a rendering mode instead of
+      rejecting it (see below).
+    </p>
+  </div>
+
+  <div class="callout">
+    <span class="label">Crop failure ≠ rejection</span>
+    A clip that's relevant and interesting but doesn't survive a 9:16 <em>cover</em> crop isn't
+    thrown away — Assembly renders it <strong>contained on black or white</strong> instead (the clip
+    shown in full at its native aspect ratio, on a brand surface) rather than force-cropping it and
+    losing the subject, or discarding a genuinely good asset over an aspect-ratio mismatch.
+  </div>
+
+  <div class="callout">
+    <span class="label">Retry &amp; fallback</span>
+    On a <code>relevant</code> or <code>visuallyInteresting</code> reject, try the next candidate —
+    up to <strong>4 attempts per beat</strong>. If nothing passes, that beat falls back to a
+    graphic-only scene (no photo/video). No silent settling for a clip that merely "sort of" fits —
+    this was the exact failure mode that produced the disliked brick-wall photo before a human had
+    to catch it by eye.
+  </div>
+
+  <h2><span class="num">06</span>Assembly</h2>
+  <div class="stage-meta"><span class="pill agent">agent, writes the .tsx</span></div>
+  <p>
+    Generates the actual Remotion composition file from the visual plan + script + approved asset
+    paths. <strong>Every scene is written from scratch</strong>, for variety. What is shared is
+    the brand, not layouts:
+  </p>
+  <ul>
+    <li><span class="path">src/brand.ts</span>: the colors, Archivo and Inter, the logo, the Reels
+      safe zone and the text-size floors.</li>
+    <li>The word-synced <span class="path">src/Captions.tsx</span> overlay.</li>
+    <li>A closing frame designed fresh each time, but always with the logo, the takeaway and
+      "Follow @thebuyboxre".</li>
+  </ul>
+  <p>
+    Before rendering, the agent must pass <span class="path">brand-lint.mjs</span>. It rejects:
+  </p>
+  <ul>
+    <li>off-palette colors, gradients, shadows and rounded corners</li>
+    <li>fonts other than Archivo and Inter, and text under 40px</li>
+    <li>a missing caption overlay, logo or follow ask</li>
+    <li>scene text that would collide with something: on top of the captions, below the safe zone
+      under Instagram's controls, or more than 40px past its other edges. This is read from the
+      component's real structure, so an offset inside a card or <code>&lt;SafeArea&gt;</code> is judged
+      against that box, not the frame.</li>
+  </ul>
+  <p>
+    Text a little outside the safe zone passes with a note, rather than failing. That covers up to
+    40px past the top, left or right edge, or dipping into the gap above the captions without
+    reaching them. The aim is the safe zone; the hard lines are only where overlap would happen.
+  </p>
+  <p>
+    Scene text goes inside <code>&lt;SafeArea&gt;</code> from <span class="path">brand.ts</span>:
+    the region inside the safe zone and above the captions. It is plumbing, not a layout; what goes
+    in it is designed per scene.
+  </p>
+  <p>
+    CI runs it again and shows anything left as a warning. The new composition is registered in
+    <span class="path">Root.tsx</span> with a placeholder duration (corrected in Stage 07).
+  </p>
+
+  <h2><span class="num">07</span>Voiceover</h2>
+  <div class="stage-meta"><span class="pill agent">agent, runs the ElevenLabs step</span></div>
+  <p>
+    The timestamp-driven approach proven across the last three videos: one continuous ElevenLabs
+    take with word-level alignment, real per-scene durations computed from the actual audio, then
+    written back into the <code>.tsx</code> scene durations and <span class="path">Root.tsx</span>'s
+    total duration — the video is timed to the voice, never the other way around.
+  </p>
+
+  <h2><span class="num">08</span>Render, Mux, Approval</h2>
+  <div class="stage-meta"><span class="pill agent">agent, Remotion + ffmpeg</span></div>
+  <p>
+    Final <code>remotion render</code>, ffmpeg mux of video + narration, then the finished file is
+    returned for human approval — the pipeline does not auto-publish or auto-deliver anything.
+    Same review gate used for every video so far.
+  </p>
+
+  <footer>
+    Next step: implement Stages 00–08 as a single Workflow script, with a <code>pipeline()</code>
+    over beats for Stages 04–05 so asset search and QA overlap across beats instead of blocking
+    each other, and a hard <code>agentCount</code> budget check given the asset retry loops can
+    realistically push a single video run to 15–20 agent calls.
+  </footer>
+</div>

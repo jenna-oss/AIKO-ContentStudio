@@ -1,0 +1,26 @@
+{
+  "name": "trilith-marketing-tool",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "description": "Competitive intelligence briefing and the daily Meta Ad Library pull that feeds it.",
+  "scripts": {
+    "pull": "node tools/pull.mjs",
+    "merge": "node tools/merge.mjs",
+    "render": "node tools/render.mjs",
+    "daily": "node tools/pull.mjs && node tools/merge.mjs && node tools/adlib-thumbs.mjs && node tools/render.mjs",
+    "thumbs": "node tools/thumbs.mjs",
+    "adlib-thumbs": "node tools/adlib-thumbs.mjs",
+    "kb": "node tools/kb-ingest.mjs && node tools/kb-process.mjs",
+    "kb:ingest": "node tools/kb-ingest.mjs",
+    "kb:process": "node tools/kb-process.mjs",
+    "kb:mirror": "node tools/kb-mirror-published.mjs",
+    "kb:mirror-videos": "node tools/kb-mirror-videos.mjs",
+    "kb:summarise": "node tools/kb-summarise.mjs",
+    "kb:seed-hooks": "node tools/kb-seed-hooks.mjs",
+    "test": "node tests/worker.test.mjs"
+  },
+  "devDependencies": {
+    "playwright": "^1.49.0"
+  }
+}

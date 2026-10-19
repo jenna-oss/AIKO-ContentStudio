@@ -1,0 +1,114 @@
+[
+  {
+    "name": "Federal Reserve monetary policy",
+    "feed": "https://www.federalreserve.gov/feeds/press_monetary.xml",
+    "document_type": "report",
+    "source": "Federal Reserve",
+    "topics": [
+      "interest rates",
+      "Fed policy"
+    ],
+    "max_items": 4,
+    "max_age_days": 45
+  },
+  {
+    "name": "Calculated Risk",
+    "feed": "https://calculatedrisk.substack.com/feed",
+    "document_type": "article",
+    "source": "Calculated Risk",
+    "topics": [
+      "housing market",
+      "mortgage rates",
+      "economic data"
+    ],
+    "max_items": 8,
+    "max_age_days": 14,
+    "disabled": true,
+    "note": "Substack returns 403 to GitHub Actions runners (works from a home connection). Re-enable if that changes."
+  },
+  {
+    "name": "Redfin News",
+    "feed": "https://www.redfin.com/news/feed/",
+    "document_type": "research",
+    "source": "Redfin",
+    "topics": [
+      "home prices",
+      "rents",
+      "housing market"
+    ]
+  },
+  {
+    "name": "Realtor.com Research",
+    "feed": "https://www.realtor.com/research/feed/",
+    "document_type": "research",
+    "source": "Realtor.com",
+    "topics": [
+      "home prices",
+      "inventory",
+      "housing market"
+    ]
+  },
+  {
+    "name": "ATTOM",
+    "feed": "https://www.attomdata.com/feed/",
+    "document_type": "research",
+    "source": "ATTOM",
+    "topics": [
+      "home flipping",
+      "foreclosures",
+      "investor activity"
+    ]
+  },
+  {
+    "name": "BiggerPockets",
+    "feed": "https://www.biggerpockets.com/blog/feed",
+    "document_type": "article",
+    "source": "BiggerPockets",
+    "topics": [
+      "real estate investing",
+      "rental properties"
+    ]
+  },
+  {
+    "name": "Stessa",
+    "feed": "https://www.stessa.com/blog/feed/",
+    "document_type": "article",
+    "source": "Stessa",
+    "topics": [
+      "rental property management",
+      "cash flow"
+    ]
+  },
+  {
+    "name": "HousingWire",
+    "feed": "https://www.housingwire.com/feed/",
+    "document_type": "article",
+    "source": "HousingWire",
+    "topics": [
+      "mortgage industry",
+      "housing market"
+    ]
+  },
+  {
+    "name": "National Mortgage News",
+    "feed": "https://www.nationalmortgagenews.com/feed?rss=true",
+    "document_type": "article",
+    "source": "National Mortgage News",
+    "topics": [
+      "mortgage industry",
+      "DSCR loans",
+      "lending"
+    ]
+  },
+  {
+    "name": "Scotsman Guide",
+    "feed": "https://www.scotsmanguide.com/rss/",
+    "document_type": "article",
+    "source": "Scotsman Guide",
+    "topics": [
+      "mortgage industry",
+      "commercial lending",
+      "non-QM"
+    ]
+  }
+]

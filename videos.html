@@ -1,0 +1,295 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Videos — Content studio</title>
+<script src="./assets/theme.js"></script>
+<script src="./assets/auth.js"></script>
+<link rel="stylesheet" href="./assets/app.css">
+</head>
+<body>
+
+<main class="page">
+  <div id="next"></div>
+  <h1>Videos</h1>
+  <div role="tablist" aria-label="Filter videos" class="row" id="filters" style="gap: 8px"></div>
+  <p class="quiet" id="state">Loading videos…</p>
+  <div class="grid-videos" id="grid"></div>
+</main>
+
+<div class="scrim" id="panel" hidden>
+  <div class="side" role="dialog" aria-modal="true" aria-labelledby="panel-label" id="side">
+    <div class="side-head">
+      <span class="eyebrow" id="panel-label"></span>
+      <button type="button" class="icon-btn" aria-label="Close" id="panel-close" style="font-size: 22px">×</button>
+    </div>
+    <div id="panel-body"></div>
+  </div>
+</div>
+
+<script src="./assets/shell.js"></script>
+<script src="./assets/editor.js"></script>
+<script>
+/* Every finished video and clip, in the five places a video can be: to
+   review, being made (an edit is running), approved, scheduled and rejected.
+   Opening one shows what can be done with it there: the editor while it is
+   to be reviewed, scheduling once it is approved, its posts once it is
+   scheduled. */
+const A = AikoApp;
+const el = A.el;
+A.header('videos');
+
+const params = new URLSearchParams(location.search);
+let filter = params.get('filter') || 'review';
+let data = { videos: [], posts: [] };
+let openId = null;
+let editor = null;
+let pollTimer = null;
+
+const FILTERS = [['review', 'To review'], ['making', 'Being made'], ['approved', 'Approved'], ['scheduled', 'Scheduled'], ['rejected', 'Rejected']];
+const EMPTY = {
+  review: ['Nothing to review. You’re all caught up.', 'Make more videos', './?start=plan'],
+  making: ['Nothing is being made right now.', null, null],
+  approved: ['Nothing approved and waiting to be scheduled.', 'See videos to review', () => setFilter('review')],
+  scheduled: ['Nothing scheduled yet.', 'See approved videos', () => setFilter('approved')],
+  rejected: ['Nothing rejected.', null, null],
+};
+const state = (v) => A.videoState(v, data.posts);
+
+async function load(fresh) {
+  try { data = await A.status(fresh); }
+  catch (err) {
+    document.getElementById('state').textContent = 'Couldn’t load the videos. ' + err.message;
+    return;
+  }
+  document.getElementById('state').hidden = true;
+  draw();
+  A.nextUp(document.getElementById('next'), { review: filter === 'review' });
+  poll();
+  const want = params.get('video');
+  if (want && !openId) { params.delete('video'); const v = data.videos.find((x) => x.id === want); if (v) { setFilter(state(v)); open(v); } }
+}
+
+function setFilter(f) {
+  filter = f;
+  const u = new URL(location.href);
+  u.searchParams.set('filter', f);
+  history.replaceState(null, '', u);
+  draw();
+}
+
+function draw() {
+  const counts = {};
+  data.videos.forEach((v) => { const s = state(v); counts[s] = (counts[s] || 0) + 1; });
+  const bar = document.getElementById('filters');
+  bar.textContent = '';
+  FILTERS.filter(([id]) => id !== 'rejected' || counts.rejected || filter === 'rejected').forEach(([id, label]) => {
+    bar.append(el('button', { type: 'button', role: 'tab', class: 'chip', 'aria-selected': String(filter === id), onclick: () => setFilter(id) },
+      label + ' ' + (counts[id] || 0)));
+  });
+
+  const grid = document.getElementById('grid');
+  grid.textContent = '';
+  const list = data.videos.filter((v) => state(v) === filter);
+  if (!list.length) {
+    const e = EMPTY[filter];
+    grid.append(el('div', { style: { gridColumn: '1 / -1' } }, A.empty(e[0], e[1], e[2])));
+    return;
+  }
+  list.forEach((v) => grid.append(card(v)));
+}
+
+function card(v) {
+  const s = state(v);
+  const failed = v.last_edit && v.last_edit.status === 'failed' && !v.last_edit.in_progress;
+  const badge = failed ? ['Edit failed', 'tag bad'] : v.kind === 'clip' ? ['Clip', 'tag'] : !v.has_source ? ['Re-make only', 'tag'] : null;
+  const thumb = el('div', { class: 'vthumb' },
+    el('video', { src: v.url.split('#')[0] + '#t=1', preload: 'metadata', muted: true, playsinline: true, 'aria-hidden': 'true' }),
+    badge ? el('span', { class: badge[1], text: badge[0] }) : null,
+    s === 'making' ? el('div', { class: 'over', text: v.last_edit.mode === 'remake' ? 'Re-making…' : 'Applying changes…' }) : null);
+  const posts = A.postsFor(v, data.posts).filter((p) => p.status !== 'cancelled');
+  const next = posts.filter((p) => p.status === 'scheduled').sort((a, b) => new Date(a.scheduled_for) - new Date(b.scheduled_for))[0];
+  const meta = [A.clock(v.duration || 0)];
+  if (s === 'scheduled') meta.push(next ? A.fmtWhen(next.scheduled_for) : posts.some((p) => p.status === 'posted') ? 'Posted' : 'Scheduled');
+  if (s === 'approved' && posts.some((p) => p.status === 'failed')) meta.push('a post failed');
+  return el('button', { type: 'button', class: 'vcard', onclick: () => open(v) },
+    thumb, el('span', { class: 'vtitle', text: v.topic || 'Untitled' }), el('span', { class: 'quiet', text: meta.join(' · ') }));
+}
+
+/* --- the panel ------------------------------------------------------------ */
+
+const panel = document.getElementById('panel');
+const side = document.getElementById('side');
+const pbody = document.getElementById('panel-body');
+const plabel = document.getElementById('panel-label');
+let lastFocus = null;
+
+function close() {
+  if (editor) { editor.destroy(); editor = null; }
+  panel.hidden = true;
+  openId = null;
+  if (lastFocus) lastFocus.focus();
+}
+document.getElementById('panel-close').addEventListener('click', close);
+panel.addEventListener('click', (e) => { if (e.target === panel) close(); });
+document.addEventListener('keydown', (e) => { if (e.key === 'Escape' && !panel.hidden) close(); });
+
+function open(v, forced) {
+  lastFocus = document.activeElement;
+  if (editor) { editor.destroy(); editor = null; }
+  openId = v.id;
+  pbody.textContent = '';
+  const s = forced || state(v);
+  side.className = 'side' + (s === 'review' || s === 'rejected' ? ' wide' : '');
+  panel.hidden = false;
+  if (s === 'review' || s === 'rejected') drawEditor(v, s === 'rejected');
+  else if (s === 'making') drawMaking(v);
+  else if (s === 'approved') drawApproved(v);
+  else drawScheduled(v);
+  setTimeout(() => document.getElementById('panel-close').focus(), 30);
+}
+
+function drawEditor(v, rejected) {
+  plabel.textContent = 'Review and edit';
+  if (rejected) {
+    pbody.append(el('div', { class: 'row', style: { padding: '12px 22px 0' } },
+      el('span', { class: 'quiet grow', text: 'Rejected. Move it back to review to edit or approve it.' }),
+      el('button', { type: 'button', class: 'btn btn-s btn-sm', onclick: async () => {
+        try { await A.api('/videos/review', { id: v.id, status: 'review' }); v.review_status = null; A.toast('Moved back to To review'); await load(true); open(v); }
+        catch (err) { A.toast(err.message); }
+      } }, 'Move back to review')));
+    return;
+  }
+  const host = el('div');
+  pbody.append(host);
+  editor = AikoEditor.mount(host, v, {
+    approveLabel: 'Approve and schedule',
+    onApprove: async () => {
+      await load(true);
+      open(v, 'approved');
+      A.toast('Approved', () => unapprove(v));
+    },
+    onReject: async () => {
+      close();
+      await load(true);
+      A.toast('Moved to Rejected', async () => { await A.api('/videos/review', { id: v.id, status: 'review' }).catch(() => {}); load(true); });
+    },
+    onSent: async (_, mode) => {
+      close();
+      A.toast(mode === 'remake' ? 'Re-make started. It’s back in To review in about 30 minutes.'
+        : mode === 'clip' ? 'Changes sent. The new cut is back in To review in a few minutes.'
+        : 'Changes sent. The new version is back in To review in about 10 minutes.');
+      await load(true);
+    },
+    onNewer: async () => { await load(true); close(); A.toast('Showing the newest version'); },
+  });
+}
+
+function drawMaking(v) {
+  plabel.textContent = 'Being made';
+  const le = v.last_edit || {};
+  pbody.append(el('div', { class: 'side-body' },
+    el('h2', { text: v.topic || 'Untitled' }),
+    el('div', { class: 'bar indeterminate' }, el('i')),
+    el('p', { class: 'ink', style: { whiteSpace: 'pre-line', margin: 0 }, text: (le.mode === 'remake' ? 'Re-making now:\n' : 'Changing now:\n') + (le.instruction || '') }),
+    el('p', { class: 'quiet', style: { margin: 0 }, text: (le.mode === 'remake' ? 'About 25–30 minutes. ' : le.mode === 'clip' ? 'A few minutes. ' : 'About 10 minutes. ') + 'It comes back under To review. You can close this.' })));
+}
+
+function videoBlock(v) {
+  return el('div', { class: 'row', style: { gap: '16px', alignItems: 'flex-start' } },
+    el('video', { src: v.url, controls: true, playsinline: true, preload: 'metadata', style: { width: '160px', aspectRatio: '9/16', background: '#000', borderRadius: '4px' } }),
+    el('div', { class: 'stack', style: { gap: '4px', flex: '1 1 200px' } }, el('h2', { text: v.topic || 'Untitled' }), el('span', { class: 'quiet', text: A.clock(v.duration || 0) + (v.kind === 'clip' ? ' · clip' : '') })));
+}
+
+function drawApproved(v) {
+  plabel.textContent = 'Approved';
+  const failed = A.postsFor(v, data.posts).filter((p) => p.status === 'failed');
+  const b = el('div', { class: 'side-body' }, videoBlock(v));
+  if (failed.length) b.append(el('div', { class: 'card pad callout bad small ink', text: 'A post of this video didn’t go out: ' + (failed[0].error || 'see Schedule for why.') }));
+  b.append(el('p', { class: 'ink', style: { margin: 0 }, text: 'Ready to go out. Pick where and when it posts.' }));
+  const actions = el('div', { class: 'row' },
+    el('button', { type: 'button', class: 'btn btn-s', onclick: () => unapprove(v) }, 'Unapprove'),
+    el('span', { class: 'grow' }),
+    el('button', { type: 'button', class: 'btn-q', onclick: close }, 'Not now'),
+    el('a', { class: 'btn btn-p', href: './schedule.html?video=' + encodeURIComponent(v.id) }, 'Schedule it'));
+  b.append(actions);
+  pbody.append(b);
+}
+
+function drawScheduled(v) {
+  plabel.textContent = 'Scheduled';
+  const posts = A.postsFor(v, data.posts).filter((p) => p.status !== 'cancelled')
+    .sort((a, b) => new Date(a.scheduled_for) - new Date(b.scheduled_for));
+  const b = el('div', { class: 'side-body' }, videoBlock(v));
+  const NAMES = { instagram: 'Instagram', facebook: 'Facebook', youtube: 'YouTube', tiktok: 'TikTok' };
+  const LABEL = { scheduled: ['Scheduled', 'tag ok'], working: ['Sending…', 'tag busy'], posted: ['Posted', 'tag'], failed: ['Failed', 'tag bad'] };
+  posts.forEach((p) => {
+    const l = LABEL[p.status] || [p.status, 'tag'];
+    b.append(el('div', { class: 'card pad stack', style: { gap: '4px' } },
+      el('div', { class: 'row', style: { gap: '8px' } }, el('span', { class: 'ink', style: { fontWeight: 600 }, text: A.fmtWhen(p.scheduled_for) }), el('span', { class: l[1], text: l[0] })),
+      el('span', { class: 'quiet', text: NAMES[p.platform] || p.platform }),
+      p.status === 'failed' && p.error ? el('span', { class: 'bad-text', text: p.error }) : null,
+      p.permalink ? el('a', { href: p.permalink, target: '_blank', rel: 'noopener', text: 'See it on ' + (NAMES[p.platform] || 'the platform') + ' ↗' }) : null));
+  });
+  const confirmHost = el('div');
+  b.append(confirmHost, el('div', { class: 'row' },
+    el('button', { type: 'button', class: 'btn btn-s', onclick: () => {
+      const live = posts.filter((p) => p.status === 'scheduled');
+      if (!live.length) { backToReview(v); return; }
+      confirmHost.textContent = '';
+      confirmHost.append(el('div', { class: 'card pad' }, A.confirmRow('Unapproving takes it off the schedule, so it won’t post. It goes back to To review.', 'Unapprove', async () => {
+        try {
+          for (const p of live) await A.api('/posts/cancel', { id: p.id });
+          await backToReview(v);
+        } catch (err) { A.toast(err.message); }
+      }, 'Keep it scheduled', () => { confirmHost.textContent = ''; })));
+    } }, 'Unapprove'),
+    el('span', { class: 'grow' }),
+    el('a', { class: 'btn btn-s', href: './schedule.html' }, 'Open Schedule')));
+  pbody.append(b);
+}
+
+/* Take an approval back: the video goes back to To review, where it can be
+   edited, approved again or rejected. */
+async function unapprove(v) {
+  try {
+    await A.api('/videos/review', { id: v.id, status: 'review' });
+    v.review_status = null;
+    close();
+    await load(true);
+    A.toast('Unapproved. It’s back in To review.', async () => {
+      await A.api('/videos/review', { id: v.id, status: 'to_post' }).catch(() => {});
+      load(true);
+    });
+  } catch (err) { A.toast(err.message); }
+}
+
+async function backToReview(v) {
+  try {
+    await A.api('/videos/review', { id: v.id, status: 'review' });
+    v.review_status = null;
+    await load(true);
+    A.toast('Back in To review');
+    open(data.videos.find((x) => x.id === v.id) || v, 'review');
+  } catch (err) { A.toast(err.message); }
+}
+
+/* While anything is being changed, look again every 30 seconds. A finished
+   edit of a render is a new video with a new id; the toast says so. */
+function poll() {
+  clearTimeout(pollTimer);
+  if (!data.videos.some((v) => state(v) === 'making')) return;
+  pollTimer = setTimeout(async () => {
+    const before = data.videos.filter((v) => state(v) === 'making').map((v) => v.session_id + '#' + v.slot + '#' + v.id);
+    await load(true);
+    const still = data.videos.filter((v) => state(v) === 'making').length;
+    if (still < before.length) A.toast(before.length - still === 1 ? 'An edited video is ready to review' : (before.length - still) + ' edited videos are ready to review');
+  }, 30000);
+}
+
+load();
+</script>
+</body>
+</html>

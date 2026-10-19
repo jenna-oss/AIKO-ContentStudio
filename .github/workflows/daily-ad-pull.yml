@@ -1,0 +1,131 @@
+name: Daily ad pull
+
+# Sweeps the Meta Ad Library, folds the results into data/ads.json, rewrites the
+# automated regions of briefing.html and pushes. GitHub Pages rebuilds on push.
+#
+# Known risk, accepted deliberately: Meta frequently challenges datacenter IPs,
+# and a headless runner cannot clear a challenge. tools/pull.mjs therefore exits
+# non-zero on an unhealthy harvest, which fails the job before anything is
+# committed. A failed run leaves the previous good data and page untouched.
+
+on:
+  # Off until the AIKO sources replace Trilith's; restore to run on a timer.
+  # schedule:
+  #   - cron: '0 11 * * *'   # 11:00 UTC / 06:00 ET daily
+  workflow_dispatch:        # lets you trigger a run by hand
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-ad-pull
+  cancel-in-progress: false
+
+jobs:
+  pull:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Install dependencies
+        run: npm install --no-audit --no-fund
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Harvest the Ad Library
+        id: harvest
+        run: node tools/pull.mjs
+
+      - name: Merge into the corpus
+        run: node tools/merge.mjs
+
+      # The wall tops brands up from this sweep when Spyglass has no paid
+      # creative for them, and those records carry no image, so the cards were
+      # rendering as a bare date plate. Fetches artwork for the handful that
+      # need it, straight from the Ad Library, and caches it — a normal day
+      # fetches nothing. Never fatal: without it the cards look how they always
+      # did, and the harvest is worth more than the pictures.
+      - name: Fetch Ad Library artwork
+        continue-on-error: true
+        run: node tools/adlib-thumbs.mjs
+
+      - name: Render the live feed
+        run: node tools/render.mjs
+
+      - name: Shape the load payload
+        run: node tools/to-sql.mjs
+
+      # Trilith's own writing changes far more slowly than the ad market, but
+      # re-harvesting is cheap and catches edits and new posts without anyone
+      # remembering to run it. Failures here must not sink the ad pull, which
+      # is the part that cannot be re-run later.
+      - name: Harvest site content
+        id: content
+        continue-on-error: true
+        run: node tools/pull-content.mjs
+
+      # Commit BEFORE touching the database. Git is the source of truth and the
+      # database is derived from it, so a database problem must never cost us
+      # the day's harvest — today's ads cannot be re-collected tomorrow, but the
+      # push can be re-run any time. This ordering was learned the hard way: a
+      # bad secret failed the push step and threw away a good sweep with it.
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data briefing.html assets/thumbs
+          if git diff --staged --quiet; then
+            echo "Nothing changed today."
+            exit 0
+          fi
+          git commit -m "Daily ad pull: $(date -u +%Y-%m-%d)"
+
+          # A commit landing while the run is in flight leaves this checkout
+          # behind and the push is rejected. Rebase onto whatever arrived and
+          # try again rather than losing the day's data.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected — rebasing onto origin/main and retrying."
+            git pull --rebase --autostash origin main || {
+              echo "::error::Rebase failed; leaving the branch untouched."
+              exit 1
+            }
+          done
+          echo "::error::Could not push after 3 attempts."
+          exit 1
+
+      # The retrieval corpus, refreshed from data now safely in git. Both steps
+      # skip themselves with a note when the secrets are absent, so the harvest
+      # still runs for anyone who has not wired up a database. They fail loudly
+      # when the secrets are present but wrong — a silently stale corpus is
+      # worse than a red run.
+      - name: Push ads to Supabase
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node tools/push-supabase.mjs
+
+      - name: Push content to Supabase
+        if: steps.content.outcome == 'success'
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: node tools/push-content.mjs
+
+      - name: Explain a failed harvest
+        if: failure() && steps.harvest.outcome == 'failure'
+        run: |
+          echo "::warning::Harvest failed the health gate. Nothing was committed."
+          echo "Most likely Meta challenged this runner's IP. If this repeats for"
+          echo "several days, move the job onto a machine with a residential IP"
+          echo "and run tools/recency-pull.js by hand in the meantime."

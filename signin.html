@@ -1,0 +1,127 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Sign in — Trilith marketing tool</title>
+<script src="./assets/theme.js"></script>
+<link rel="stylesheet" href="./assets/nav.css">
+<style>
+  :root {
+    --forest:#0B3529; --cream-text:#EAE9D5; --emerald:#2C785E; --sage:#6E9C86;
+    --ground:#ECE9D8; --card:#F4F2E7; --card-sunk:#E3DFCB;
+    --ink:#103224; --ink-body:#3B5850; --ink-quiet:#6F8279;
+    --rule:#D2CDB6; --rule-strong:#B8B29A; --accent:#2C785E; --clay:#A65A3C;
+    --sans:"Poppins","Century Gothic","Avenir Next","Futura",system-ui,-apple-system,"Segoe UI",sans-serif;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#072A1F; --card:#0E3B2C; --card-sunk:#0A3125;
+      --ink:#EAE9D5; --ink-body:#B9C9C0; --ink-quiet:#7E9A8D;
+      --rule:#1C4A3A; --rule-strong:#2A5D4A; --accent:#6E9C86; --clay:#C87A57;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:#ECE9D8; --card:#F4F2E7; --card-sunk:#E3DFCB;
+    --ink:#103224; --ink-body:#3B5850; --ink-quiet:#6F8279;
+    --rule:#D2CDB6; --rule-strong:#B8B29A; --accent:#2C785E; --clay:#A65A3C;
+  }
+  :root[data-theme="dark"] {
+    --ground:#072A1F; --card:#0E3B2C; --card-sunk:#0A3125;
+    --ink:#EAE9D5; --ink-body:#B9C9C0; --ink-quiet:#7E9A8D;
+    --rule:#1C4A3A; --rule-strong:#2A5D4A; --accent:#6E9C86; --clay:#C87A57;
+  }
+  * { box-sizing: border-box; }
+  body {
+    margin:0; min-height:100vh; background:var(--ground); color:var(--ink-body);
+    font-family:var(--sans); font-size:16px; line-height:1.6; -webkit-font-smoothing:antialiased;
+    display:flex; flex-direction:column;
+  }
+  main { flex:1; display:flex; flex-direction:column; align-items:center; padding:3rem 1rem; }
+  #clerk { width:100%; display:flex; justify-content:center; }
+  .msg { max-width:400px; width:100%; margin:0 0 1rem; font-size:.8125rem; border-radius:4px; padding:.5rem .625rem; }
+  .msg.bad { background:var(--card-sunk); color:var(--clay); }
+  .msg.ok { background:var(--card-sunk); color:var(--ink-body); }
+  .msg[hidden] { display:none; }
+</style>
+</head>
+<body>
+
+<header class="site-head">
+  <span class="site-brand">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+      <circle cx="15" cy="15" r="13.5" fill="none" stroke="#6E9C86" stroke-width="1.25"/>
+      <text x="15" y="18.5" text-anchor="middle" fill="#EAE9D5"
+            font-family="Poppins, Century Gothic, sans-serif" font-size="7.5" font-weight="700">AIKO</text>
+    </svg>
+    <span>
+      <span class="name">Trilith marketing tool</span><br>
+      <span class="who">aikogroup.io — internal</span>
+    </span>
+  </span>
+</header>
+
+<main>
+  <p class="msg" id="msg" role="status" hidden></p>
+  <!-- Clerk draws the sign-in box here: single sign-on and email and
+       password, with its own forgotten-password flow. -->
+  <div id="clerk"></div>
+</main>
+
+<script src="./assets/clerk.js"></script>
+<script>
+/* Signing in happens between this page and Clerk. Every other page then sends
+   Clerk's session token to the Worker, which checks it and this app's list
+   (kb.app_users) on every call. */
+const msg = document.getElementById('msg');
+function say(text, tone) {
+  msg.textContent = text || '';
+  msg.className = 'msg ' + (tone || 'ok');
+  msg.hidden = !text;
+}
+
+/* Where to go after signing in: back to the page that sent you here. Only a
+   page of this site, so the link can't be used to send someone elsewhere. */
+const params = new URLSearchParams(location.search);
+function nextPage() {
+  const next = params.get('next') || '';
+  return /^[a-z0-9-]+\.html(\?[^#]*)?$/i.test(next) ? './' + next : './';
+}
+
+/* Clerk's box in this page's colours, light or dark. */
+function appearance() {
+  const css = getComputedStyle(document.documentElement);
+  const v = (name) => css.getPropertyValue(name).trim();
+  return {
+    variables: {
+      colorPrimary: '#2C785E',
+      colorBackground: v('--card'),
+      colorText: v('--ink'),
+      colorTextSecondary: v('--ink-quiet'),
+      colorInputBackground: v('--ground'),
+      colorInputText: v('--ink'),
+      colorDanger: v('--clay'),
+      fontFamily: v('--sans'),
+      borderRadius: '6px',
+    },
+  };
+}
+
+const why = params.get('why');
+if (why === 'expired') say('Your session ended. Sign in again.', 'ok');
+if (why === 'not-listed') say('That email isn’t on the list for this app. Ask to be added.', 'bad');
+
+AikoClerk.ready.then((clerk) => {
+  const next = new URL(nextPage(), location.href).href;
+  /* Already signed in, and not just bounced off the list: carry on. */
+  if (clerk.user && why !== 'not-listed') { location.replace(next); return; }
+  clerk.mountSignIn(document.getElementById('clerk'), {
+    forceRedirectUrl: next,
+    signUpForceRedirectUrl: next,
+    appearance: appearance(),
+  });
+}, (err) => say(err.message, 'bad'));
+</script>
+</body>
+</html>

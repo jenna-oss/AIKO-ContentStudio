@@ -1,0 +1,146 @@
+name: Daily creator pull
+
+# Refreshes the educational-creators page: each creator's clips, the roster
+# itself, and the hook library rebuilt from that day's harvest.
+#
+# Separate from the daily ad pull on purpose. That job drives Chromium against
+# the Meta Ad Library and is the slow, fragile one; this is two API calls per
+# creator and needs no browser. Coupling them would mean a Meta IP challenge
+# takes the creators page down with it.
+#
+# Unlike briefing.html, creators.html fetches its JSON in the browser, so
+# there is no render step — rewriting the data files is the whole publish.
+#
+# Cost note: Spyglass bills credits per row returned. Twelve rows per creator
+# per day against a roster capped at 16 is the ceiling this job can reach; the
+# weekly hook-pattern job stayed weekly for exactly this reason, so if credits
+# get tight, this is the schedule to loosen first.
+
+on:
+  # Off until the AIKO sources replace Trilith's; restore to run on a timer.
+  # schedule:
+  #   - cron: '0 13 * * *'   # 13:00 UTC / 08:00 ET, after the ad pull has landed
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: daily-creator-pull
+  cancel-in-progress: false
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      # Harvests organic clips for every pinned creator, screens them for
+      # residential real estate relevance, and looks for creators to add.
+      #
+      # Both keys are optional and the script says which one is missing. With
+      # no Anthropic key it refuses to replace any clips rather than publish
+      # unscreened ones — the corpus returns plenty of off-thesis video, and a
+      # travel-hack clip on this page is worse than a stale one.
+      - name: Harvest creators
+        id: creators
+        env:
+          SPYGLASS_API_KEY: ${{ secrets.SPYGLASS_API_KEY }}
+          # The repo secret is named ANTHROPIC_API; the scripts read ANTHROPIC_API_KEY.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+        run: node tools/pull-creators.mjs
+
+      # Rebuilt from whatever was just harvested, so the library and the clips
+      # under it always describe the same day's material.
+      #
+      # Not allowed to sink the run. The clips are the expensive half and are
+      # already written by this point; losing them because pattern mining had
+      # a bad day would throw away a good harvest to fix a stale sidebar. The
+      # ad pull learned this ordering the hard way and the same rule applies.
+      - name: Rebuild the hook library
+        id: hooks
+        continue-on-error: true
+        env:
+          # The repo secret is named ANTHROPIC_API; the scripts read ANTHROPIC_API_KEY.
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
+        run: node tools/creator-hooks.mjs
+
+      # The reach comparison: best organic post, creators against the nine board
+      # lenders. Runs after the harvest because the creator half is read from
+      # the screened roster that step just wrote.
+      #
+      # This is the expensive addition -- nine more brands a day -- and it is
+      # the section that most needs to be current, since its heading makes a
+      # live claim about who this audience watches.
+      #
+      # Not allowed to sink the run, for the same reason as the hook library:
+      # the roster is already written by this point.
+      - name: Refresh the reach comparison
+        id: reach
+        continue-on-error: true
+        env:
+          SPYGLASS_API_KEY: ${{ secrets.SPYGLASS_API_KEY }}
+        run: node tools/pull-reach.mjs
+
+      - name: Commit and push
+        run: |
+          git config user.name  "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add data/education-creators.json data/creator-hook-patterns.json data/reach.json
+          if git diff --staged --quiet; then
+            echo "No change in creators or hook patterns today."
+            exit 0
+          fi
+          git commit -m "Daily creator pull: $(date -u +%Y-%m-%d)"
+
+          # A commit landing while this run is in flight leaves the checkout
+          # behind and the push is rejected. Rebase onto whatever arrived and
+          # try again rather than losing the harvest. The daily ad pull commits
+          # around this time and is the likely collision.
+          for attempt in 1 2 3; do
+            if git push; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected — rebasing onto origin/main and retrying."
+            git pull --rebase --autostash origin main || {
+              echo "::error::Rebase failed; leaving the branch untouched."
+              exit 1
+            }
+          done
+          echo "::error::Could not push after 3 attempts."
+          exit 1
+
+      - name: Flag a stale reach comparison
+        if: steps.reach.outcome == 'failure'
+        run: |
+          echo "::warning::The reach comparison did not refresh; the chart still shows the previous figures."
+          echo "It refuses to write unless BOTH halves have rows — creators with no lenders"
+          echo "to measure against would leave the heading claiming a gap the chart no longer shows."
+
+      - name: Flag a stale hook library
+        if: steps.hooks.outcome == 'failure'
+        run: |
+          echo "::warning::The hook library did not rebuild; the page still shows the previous patterns."
+          echo "The clips DID refresh, so the library now describes yesterday's material."
+          echo "Read the hook step's log — either too few spoken hooks survived the"
+          echo "relevance screen, or every quote failed exact-match verification."
+
+      # Discovery is the one part of this job that is not proven against the
+      # live API. searchBrands is documented only on the Spyglass MCP surface,
+      # which is tied to a Claude account and unreachable from a runner, so
+      # tools/pull-creators.mjs tries the plausible REST spellings and logs
+      # which one answered. Until a run confirms a route, the roster refreshes
+      # but does not grow.
+      - name: Report the discovery route
+        if: always()
+        run: |
+          echo "If the harvest log has no 'discovery route ... answered' line, no REST"
+          echo "search endpoint was found and SEARCH_ROUTES in tools/pull-creators.mjs"
+          echo "needs the real path. Everything else in this job works without it."

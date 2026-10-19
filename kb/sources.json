@@ -1,0 +1,10 @@
+[
+  {
+    "url": "https://www.example.com/replace-me",
+    "document_type": "research",
+    "source": "Publisher name",
+    "topics": ["mortgage rates"],
+    "research_type": "market_report",
+    "disabled": true
+  }
+]

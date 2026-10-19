@@ -1,0 +1,547 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Educational creators — Private Real Estate Lending</title>
+<script src="./assets/theme.js"></script>
+<script src="./assets/auth.js"></script>
+<link rel="stylesheet" href="./assets/nav.css">
+<style>
+  :root {
+    --cream-text:#EAE9D5; --emerald:#2C785E; --emerald-bar:#407C62; --sage:#6E9C86;
+    --ground:#ECE9D8; --panel:#0B3529; --card:#F4F2E7; --card-sunk:#E3DFCB;
+    --ink:#103224; --ink-body:#3B5850; --ink-quiet:#6F8279;
+    --rule:#D2CDB6; --rule-strong:#B8B29A; --accent:#2C785E; --clay:#A65A3C; --ochre:#B5823F;
+    --sans:"Poppins","Century Gothic","Avenir Next","Futura",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --mono:ui-monospace,"Cascadia Mono","Cascadia Code","SF Mono",Consolas,monospace;
+    --s1:.5rem; --s2:.75rem; --s3:1rem; --s4:1.5rem; --s5:2rem; --s6:3rem;
+  }
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --ground:#072A1F; --card:#0E3B2C; --card-sunk:#0A3125;
+      --ink:#EAE9D5; --ink-body:#B9C9C0; --ink-quiet:#7E9A8D;
+      --rule:#1C4A3A; --rule-strong:#2A5D4A; --accent:#6E9C86; --clay:#C87A57; --ochre:#D0A05C;
+    }
+  }
+  :root[data-theme="light"] {
+    --ground:#ECE9D8; --card:#F4F2E7; --card-sunk:#E3DFCB;
+    --ink:#103224; --ink-body:#3B5850; --ink-quiet:#6F8279;
+    --rule:#D2CDB6; --rule-strong:#B8B29A; --accent:#2C785E; --clay:#A65A3C; --ochre:#B5823F;
+  }
+  :root[data-theme="dark"] {
+    --ground:#072A1F; --card:#0E3B2C; --card-sunk:#0A3125;
+    --ink:#EAE9D5; --ink-body:#B9C9C0; --ink-quiet:#7E9A8D;
+    --rule:#1C4A3A; --rule-strong:#2A5D4A; --accent:#6E9C86; --clay:#C87A57; --ochre:#D0A05C;
+  }
+
+  * { box-sizing:border-box; }
+  body {
+    margin:0; background:var(--ground); color:var(--ink-body);
+    font-family:var(--sans); font-size:16px; line-height:1.6;
+    -webkit-font-smoothing:antialiased;
+  }
+  .wrap { max-width:1080px; margin:0 auto; padding:var(--s5) var(--s4) var(--s6); }
+  h2 { color:var(--ink); font-weight:700; line-height:1.12; margin:0 0 var(--s2); font-size:1.5rem; }
+  h3 { color:var(--ink); font-weight:700; margin:0 0 var(--s2); font-size:1rem; }
+
+  .note {
+    background:var(--card); border:1px dashed var(--clay); border-radius:4px;
+    padding:var(--s3) var(--s4); margin-bottom:var(--s5); font-size:.875rem;
+  }
+  .note h3 { color:var(--clay); }
+  .note p { margin:0 0 var(--s2); }
+  .note p:last-child { margin-bottom:0; }
+  .note code { font-family:var(--mono); font-size:.8125rem; background:var(--card-sunk); padding:.125rem .375rem; border-radius:2px; }
+
+  .filters { display:flex; flex-wrap:wrap; gap:.5rem; margin-bottom:var(--s5); }
+  .filters button {
+    font-family:var(--sans); font-size:.8125rem; color:var(--ink-body);
+    background:transparent; border:1px solid var(--rule-strong); border-radius:999px;
+    padding:.4375rem .875rem; cursor:pointer;
+  }
+  .filters button:hover { border-color:var(--accent); color:var(--ink); }
+  .filters button[aria-pressed="true"] { border-color:var(--accent); color:var(--ink); background:var(--card); }
+  .filters button:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+
+  .creators { display:flex; flex-direction:column; gap:var(--s4); }
+  .creator {
+    background:var(--card); border:1px solid var(--rule);
+    border-left:3px solid var(--emerald-bar); border-radius:4px; padding:var(--s4);
+  }
+  .creator-head { display:flex; gap:var(--s3); align-items:flex-start; margin-bottom:var(--s3); }
+  .creator-head img {
+    width:56px; height:56px; border-radius:50%; object-fit:cover; flex:none;
+    background:var(--card-sunk);
+  }
+  .creator-id { min-width:0; flex:1; }
+  .creator-id .name { font-weight:700; color:var(--ink); font-size:1.0625rem; }
+  .creator-id .handle {
+    font-family:var(--mono); font-size:.75rem; color:var(--ink-quiet);
+    text-decoration:none;
+  }
+  .creator-id .handle:hover { color:var(--accent); }
+  .creator-id .followers { font-family:var(--mono); font-size:.75rem; color:var(--ink-quiet); }
+  .creator-angle { font-size:.9375rem; margin:0 0 var(--s3); max-width:64ch; }
+  .creator-chips { display:flex; flex-wrap:wrap; gap:.375rem; margin-bottom:var(--s3); }
+  .chip {
+    font-family:var(--mono); font-size:.625rem; letter-spacing:.04em; text-transform:uppercase;
+    font-weight:700; color:var(--accent); border:1px solid var(--accent);
+    border-radius:999px; padding:.125rem .5rem;
+  }
+
+  .clips { display:grid; gap:.75rem; grid-template-columns:repeat(auto-fill, minmax(170px, 1fr)); }
+  .clip {
+    display:block; background:var(--card-sunk); border:1px solid var(--rule);
+    border-radius:4px; overflow:hidden; text-decoration:none; color:inherit;
+  }
+  .clip:hover { border-color:var(--accent); }
+  .clip:focus-visible { outline:2px solid var(--accent); outline-offset:2px; }
+  .clip .frame {
+    aspect-ratio:9/16; background:var(--rule); position:relative;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+  }
+  .clip .frame img { width:100%; height:100%; object-fit:cover; display:block; }
+  .clip .views {
+    position:absolute; right:.3125rem; bottom:.3125rem;
+    font-family:var(--mono); font-size:.5625rem; color:#EAE9D5;
+    background:#0B3529cc; padding:.09375rem .3125rem; border-radius:2px;
+  }
+  .clip .cat {
+    position:absolute; left:.3125rem; top:.3125rem;
+    font-family:var(--mono); font-size:.5625rem; letter-spacing:.04em; text-transform:uppercase;
+    font-weight:700; color:#EAE9D5; background:#2C785Ecc; padding:.09375rem .375rem; border-radius:2px;
+  }
+  .clip .line {
+    font-size:.75rem; color:var(--ink); padding:.5rem .5625rem; line-height:1.35;
+    display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;
+  }
+
+  .patterns { display:flex; flex-direction:column; gap:.625rem; margin-bottom:var(--s5); }
+  .pattern {
+    background:var(--card); border:1px solid var(--rule); border-radius:4px;
+    padding:.75rem 1rem;
+  }
+  .pattern-head { display:flex; align-items:baseline; gap:.5rem; flex-wrap:wrap; margin-bottom:.25rem; }
+  .pattern-head .name { font-weight:700; color:var(--ink); font-size:.9375rem; }
+  .pattern-head .count {
+    font-family:var(--mono); font-size:.625rem; letter-spacing:.03em; text-transform:uppercase;
+    color:var(--ink-quiet);
+  }
+  .pattern-desc { font-size:.8125rem; margin:0 0 .5rem; }
+  .pattern-examples { display:flex; flex-direction:column; gap:.25rem; }
+  .pattern-ex {
+    font-size:.8125rem; font-style:italic; color:var(--ink);
+    border-left:2px solid var(--emerald-bar); padding-left:.5rem;
+  }
+  .pattern-ex b { font-style:normal; font-family:var(--mono); font-size:.6875rem; color:var(--ink-quiet); }
+
+  /* ============================================================
+     Creator benchmark — the reach gulf, moved here from the briefing
+     ============================================================ */
+
+  .legend {
+    display:flex; flex-wrap:wrap; gap:var(--s4);
+    margin-bottom:var(--s4);
+    font-size:.75rem; color:var(--ink-quiet);
+  }
+  .legend span { display:inline-flex; align-items:center; gap:.5rem; }
+  .legend i { width:14px; height:4px; border-radius:2px; display:inline-block; }
+
+  .bench { display:grid; gap:.375rem; margin-top:var(--s4); margin-bottom:var(--s5); }
+  .bench-row {
+    display:grid;
+    grid-template-columns:minmax(0, 15rem) minmax(0, 1fr) 4.5rem;
+    gap:var(--s3); align-items:center; padding:.3125rem 0;
+  }
+  .bench-row .who {
+    font-size:.8125rem; color:var(--ink);
+    overflow:hidden; text-overflow:ellipsis; white-space:nowrap;
+  }
+  .bench-row .who i { font-style:normal; color:var(--ink-quiet); }
+  /* Both are spans, so they must be blockified explicitly — percentage
+     width and height:100% do not apply to inline boxes. */
+  .bench-track {
+    display:block; background:var(--card-sunk); border-radius:2px;
+    height:14px; overflow:hidden;
+  }
+  .bench-fill { display:block; height:100%; border-radius:2px; min-width:3px; }
+  .bench-row[data-kind="creator"] .bench-fill { background:var(--emerald-bar); }
+  .bench-row[data-kind="lender"]  .bench-fill { background:var(--clay); }
+  .bench-row .v {
+    font-family:var(--mono); font-size:.8125rem; text-align:right;
+    color:var(--ink); font-variant-numeric:tabular-nums;
+  }
+  @media (max-width: 640px) {
+    .bench-row { grid-template-columns:minmax(0, 1fr) 4rem; }
+    .bench-track { grid-column:1 / -1; }
+  }
+
+  /* Neutral analysis card. Deliberately not .note, which is dashed clay and
+     reads as a caveat — this is a finding, not a warning. */
+
+  .empty {
+    text-align:center; color:var(--ink-quiet); font-size:.875rem;
+    border:1px solid var(--rule); border-radius:4px; padding:var(--s5) var(--s4);
+  }
+
+  /* Closes the page rather than opening it: the roster above is the argument,
+     this is what it adds up to. Counts come from the data file, so the daily
+     job keeps them honest. */
+  .page-close {
+    margin-top:var(--s6); padding-top:var(--s5);
+    border-top:1px solid var(--rule-strong);
+  }
+  /* It heads the chart now rather than closing the page, so it needs air
+     beneath it as well as the rule above. */
+  .page-close + h3 { margin-top:var(--s5); }
+</style>
+</head>
+<body>
+
+<header class="site-head">
+  <a class="site-brand" href="./">
+    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
+      <circle cx="15" cy="15" r="13.5" fill="none" stroke="#6E9C86" stroke-width="1.25"/>
+      <text x="15" y="18.5" text-anchor="middle" fill="#EAE9D5"
+            font-family="Poppins, Century Gothic, sans-serif" font-size="7.5" font-weight="700">AIKO</text>
+    </svg>
+    <span>
+      <span class="name">Trilith marketing tool</span><br>
+      <span class="who">aikogroup.io — internal</span>
+    </span>
+  </a>
+
+  <nav class="site-nav" aria-label="Sections">
+    <span class="nav-group">
+      <span class="nav-group-label">Research</span>
+      <a class="nav-link" href="./briefing.html">Competitors</a>
+      <a class="nav-link" href="./creators.html" aria-current="page">Creators</a>
+    </span>
+    <span class="nav-group">
+      <span class="nav-group-label">Studio</span>
+      <a class="nav-link" href="./">Create</a>
+      <a class="nav-link" href="./videos.html">Videos</a>
+      <a class="nav-link" href="./library.html">Library</a>
+      <a class="nav-link" href="./schedule.html">Schedule</a>
+    </span>
+    <button class="theme-toggle" id="theme-toggle" type="button"
+            aria-label="Toggle light and dark theme" aria-pressed="false">
+      <span data-theme-label>Dark</span>
+    </button>
+  </nav>
+</header>
+
+<main class="wrap">
+
+  <h3 style="font-size:1.125rem; color:var(--ink); margin:0 0 .375rem;">Hook library</h3>
+  <p class="page-lede" style="max-width:56ch; margin:0 0 1.25rem; font-size:.9375rem;">
+    Opening lines that repeat across these creators. A pattern is listed once two of them
+    use it independently; the rest are marked single example.
+  </p>
+  <div class="patterns" id="patterns"></div>
+
+  <div class="note">
+    <h3>Where this came from</h3>
+    <p>
+      Refreshed daily from the Spyglass corpus. Clips are organic posts only, screened for
+      residential real estate relevance before they land here, and creators are added
+      automatically once enough of their recent posts pass that screen.
+      <span id="refreshed"></span>
+    </p>
+    <p>
+      The hook library is rebuilt from the same day's clips. Spyglass returns no pattern
+      data for organic posts, so the patterns are read off the hooks themselves, and every
+      quote is checked against a harvested hook before it is published.
+    </p>
+    <p>
+      Clips link to the creators' own posts. Internal reference only — not for republishing.
+    </p>
+  </div>
+
+  <div class="filters" id="filters" role="group" aria-label="Filter by product line"></div>
+
+  <div class="creators" id="creators"></div>
+
+  <div class="empty" id="empty" hidden>No creators match that filter.</div>
+
+  <section class="page-close">
+    <p class="page-eyebrow">Intelligence — creators</p>
+    <h2 class="page-title" style="font-size:clamp(1.75rem,3.4vw,2.5rem); letter-spacing:-.015em; margin:0 0 .5rem;">
+      Single-person educators, not brand ads
+    </h2>
+    <p class="page-lede" id="roster-summary" style="max-width:56ch; margin:0;"></p>
+  </section>
+
+  <h3 style="font-size:1.125rem; color:var(--ink); margin:var(--s5) 0 .375rem;">Who this audience actually watches</h3>
+  <p class="page-lede" style="max-width:56ch; margin:0 0 1.25rem; font-size:.9375rem;">
+    Best-performing organic post, creators against lenders, same audience and same
+    platform. Paid ads are excluded from both sides.
+    <span id="reach-stamp"></span>
+  </p>
+  <div class="legend">
+    <span><i style="background:var(--emerald-bar)"></i> Real estate creators</span>
+    <span><i style="background:var(--clay)"></i> Lenders</span>
+  </div>
+  <div class="bench" id="bench"></div>
+  <p class="empty" id="bench-empty" hidden>Reach comparison unavailable.</p>
+
+</main>
+
+<script>
+const PRODUCT_LABELS = {
+  dscr: 'DSCR', 'fix-and-flip': 'Fix & flip', bridge: 'Bridge',
+  'ground-up': 'Ground-up', portfolio: 'Portfolio', brrrr: 'BRRRR', multifamily: 'Multifamily',
+};
+
+let data = null;
+let active = 'all';
+
+fetch('./data/education-creators.json')
+  .then((r) => r.ok ? r.json() : null)
+  .then((json) => { data = json; render(); stamp(json); summarise(json); })
+  .catch(() => { document.getElementById('empty').hidden = false; document.getElementById('empty').textContent = 'Could not load creator data.'; });
+
+fetch('./data/creator-hook-patterns.json')
+  .then((r) => r.ok ? r.json() : null)
+  .then((json) => { renderPatterns(json); })
+  .catch(() => {});
+
+/* A page that refreshes daily should say when it last did. If the job stops,
+   the date going stale is the only symptom anyone would see here. */
+const fmt = (d) => d.toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric', timeZone: 'UTC' });
+
+function stamp(json) {
+  const el = document.getElementById('refreshed');
+  if (!el || !json || !json.fetchedAt) return;
+  const d = new Date(json.fetchedAt);
+  if (Number.isNaN(d.getTime())) return;
+  /* UTC, because the job stamps UTC. Formatting in the reader's zone turns a
+     midnight-UTC stamp into the previous day west of Greenwich, which reads as
+     a refresh that did not happen. */
+  el.textContent = ` Last refreshed ${fmt(d)}.`;
+}
+
+/* The closing line. Written from the data rather than typed into the markup,
+   so it cannot drift from the roster the way a hand-kept count would. */
+function summarise(json) {
+  const el = document.getElementById('roster-summary');
+  if (!el || !json || !Array.isArray(json.creators) || !json.creators.length) return;
+  const people = json.creators.length;
+  const clips = json.creators.reduce((n, c) => n + ((c.videos || []).length), 0);
+  const d = new Date(json.fetchedAt);
+  const when = Number.isNaN(d.getTime()) ? null : fmt(d);
+  el.textContent = `${people} of them, ${clips} clips between them${when ? `, refreshed ${when}` : ''}.`;
+}
+
+/* The chart was twelve hardcoded rows -- names, view counts and bar widths all
+   typed by hand -- under a heading making a live claim. Built from data now, so
+   the claim and the bars cannot come apart. Widths are relative to the top row,
+   which is what made the original readable: the gap IS the argument. */
+function renderReach(json) {
+  const el = document.getElementById('bench');
+  const empty = document.getElementById('bench-empty');
+  if (!el) return;
+  const rows = (json && Array.isArray(json.rows)) ? json.rows : [];
+  if (!rows.length) { if (empty) empty.hidden = false; return; }
+
+  const max = Math.max(...rows.map((r) => Number(r.views) || 0));
+  if (!max) { if (empty) empty.hidden = false; return; }
+
+  el.innerHTML = '';
+  rows.forEach((r) => {
+    const row = document.createElement('div');
+    row.className = 'bench-row';
+    row.dataset.kind = r.kind === 'lender' ? 'lender' : 'creator';
+
+    const who = document.createElement('span');
+    who.className = 'who';
+    who.textContent = r.name;
+    if (r.note) {
+      const i = document.createElement('i');
+      i.textContent = ` · ${r.note}`;
+      who.append(i);
+    }
+
+    const track = document.createElement('span');
+    track.className = 'bench-track';
+    const fill = document.createElement('span');
+    fill.className = 'bench-fill';
+    /* A floor of 1%, or the smallest lenders render as no bar at all and read
+       as missing data rather than as the point being made. */
+    fill.style.width = `${Math.max(1, ((Number(r.views) || 0) / max) * 100).toFixed(1)}%`;
+    track.append(fill);
+
+    const v = document.createElement('span');
+    v.className = 'v';
+    v.textContent = r.viewsLabel ?? '';
+
+    row.append(who, track, v);
+    el.append(row);
+  });
+
+  const stamp = document.getElementById('reach-stamp');
+  if (stamp && json.fetchedAt) {
+    const d = new Date(json.fetchedAt);
+    if (!Number.isNaN(d.getTime())) stamp.textContent = ` Measured ${fmt(d)}.`;
+  }
+}
+
+fetch('./data/reach.json')
+  .then((r) => (r.ok ? r.json() : null))
+  .then(renderReach)
+  .catch(() => { const e = document.getElementById('bench-empty'); if (e) e.hidden = false; });
+
+function renderPatterns(json) {
+  const el = document.getElementById('patterns');
+  if (!json || !json.patterns || !json.patterns.length) return;
+  el.innerHTML = '';
+  /* Convergent patterns first — multiple creators landing on the same form
+     independently is the signal that it actually works, not just a habit. */
+  const sorted = [...json.patterns].sort((a, b) => b.creatorCount - a.creatorCount);
+  sorted.forEach((p) => {
+    const card = document.createElement('div');
+    card.className = 'pattern';
+    const head = document.createElement('div');
+    head.className = 'pattern-head';
+    const name = document.createElement('span');
+    name.className = 'name';
+    name.textContent = p.label;
+    const count = document.createElement('span');
+    count.className = 'count';
+    count.textContent = p.creatorCount > 1 ? `${p.creatorCount} creators` : 'single example';
+    head.append(name, count);
+    const desc = document.createElement('p');
+    desc.className = 'pattern-desc';
+    desc.textContent = p.description;
+    const examples = document.createElement('div');
+    examples.className = 'pattern-examples';
+    (p.examples || []).forEach((ex) => {
+      const line = document.createElement('div');
+      line.className = 'pattern-ex';
+      line.innerHTML = `&ldquo;${ex.quote.replace(/&/g, '&amp;').replace(/</g, '&lt;')}&rdquo; <b>— ${ex.creator}</b>`;
+      examples.append(line);
+    });
+    card.append(head, desc, examples);
+    el.append(card);
+  });
+}
+
+function render() {
+  const creatorsEl = document.getElementById('creators');
+  const filtersEl = document.getElementById('filters');
+  const emptyEl = document.getElementById('empty');
+  if (!data || !data.creators || !data.creators.length) {
+    emptyEl.hidden = false;
+    emptyEl.textContent = 'No creators recorded yet.';
+    return;
+  }
+
+  if (!filtersEl.children.length) {
+    const lines = [...new Set(data.creators.flatMap((c) => c.productLines || []))];
+    [['all', 'All'], ...lines.map((l) => [l, PRODUCT_LABELS[l] || l])].forEach(([key, label], i) => {
+      const b = document.createElement('button');
+      b.type = 'button';
+      b.textContent = label;
+      b.setAttribute('aria-pressed', String(i === 0));
+      b.addEventListener('click', () => {
+        active = key;
+        filtersEl.querySelectorAll('button').forEach((x) => x.setAttribute('aria-pressed', String(x === b)));
+        render();
+      });
+      filtersEl.append(b);
+    });
+  }
+
+  creatorsEl.innerHTML = '';
+  const shown = data.creators.filter((c) => active === 'all' || (c.productLines || []).includes(active));
+  emptyEl.hidden = shown.length > 0;
+
+  shown.forEach((c) => {
+    const card = document.createElement('div');
+    card.className = 'creator';
+
+    const head = document.createElement('div');
+    head.className = 'creator-head';
+    if (c.avatarUrl) {
+      const img = document.createElement('img');
+      img.src = c.avatarUrl; img.alt = ''; img.loading = 'lazy';
+      head.append(img);
+    }
+    const id = document.createElement('div');
+    id.className = 'creator-id';
+    const name = document.createElement('div');
+    name.className = 'name';
+    name.textContent = c.name;
+    const meta = document.createElement('div');
+    const handle = document.createElement('a');
+    handle.className = 'handle';
+    handle.href = c.profileUrl || '#';
+    handle.target = '_blank'; handle.rel = 'noopener noreferrer';
+    handle.textContent = `${c.handle} · ${c.platform}`;
+    const followers = document.createElement('span');
+    followers.className = 'followers';
+    followers.textContent = c.followers ? `  ·  ${c.followers} followers` : '';
+    meta.append(handle, followers);
+    id.append(name, meta);
+    head.append(id);
+
+    const angle = document.createElement('p');
+    angle.className = 'creator-angle';
+    angle.textContent = c.angle || '';
+
+    const chips = document.createElement('div');
+    chips.className = 'creator-chips';
+    (c.productLines || []).forEach((l) => {
+      const chip = document.createElement('span');
+      chip.className = 'chip';
+      chip.textContent = PRODUCT_LABELS[l] || l;
+      chips.append(chip);
+    });
+
+    const clips = document.createElement('div');
+    clips.className = 'clips';
+    (c.videos || []).forEach((v) => {
+      const a = document.createElement('a');
+      a.className = 'clip';
+      a.href = v.mediaUrl; a.target = '_blank'; a.rel = 'noopener noreferrer';
+
+      const frame = document.createElement('div');
+      frame.className = 'frame';
+      if (v.thumbnailUrl) {
+        const img = document.createElement('img');
+        img.src = v.thumbnailUrl; img.alt = ''; img.loading = 'lazy';
+        frame.append(img);
+      }
+      if (v.category) {
+        const cat = document.createElement('span');
+        cat.className = 'cat';
+        cat.textContent = v.category;
+        frame.append(cat);
+      }
+      if (v.views) {
+        const views = document.createElement('span');
+        views.className = 'views';
+        views.textContent = `${v.views} views`;
+        frame.append(views);
+      }
+
+      const line = document.createElement('div');
+      line.className = 'line';
+      line.textContent = v.hook ? `“${v.hook}”` : '';
+
+      a.append(frame, line);
+      clips.append(a);
+    });
+
+    card.append(head, angle, chips, clips);
+    creatorsEl.append(card);
+  });
+
+}
+
+if (window.AikoTheme) AikoTheme.mount(document.getElementById('theme-toggle'));
+</script>
+</body>
+</html>
