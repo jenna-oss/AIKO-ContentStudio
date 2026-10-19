@@ -428,7 +428,7 @@
     m.open = m.open || {};
     var card = el('div', { class: 'card', style: { padding: '4px 20px 14px' } });
     m.briefs.forEach(function (b, i) {
-      var meta = [b.hook_form && 'Hook: ' + b.hook_form, b.product, b.audience && 'For ' + b.audience, b.hook_source && 'From ' + b.hook_source].filter(Boolean).join(' · ');
+      var meta = [b.hook_form && 'Hook: ' + b.hook_form, b.product && 'Job: ' + b.product, b.audience && 'For ' + b.audience, b.hook_source && 'From ' + b.hook_source].filter(Boolean).join(' · ');
       var writeBtn = el('button', { type: 'button', class: 'btn-q', style: { padding: '0 4px', minHeight: '36px' }, onclick: function () { filmIdea(b, i + 1, writeBtn); } }, 'Film it myself instead');
       card.append(el('div', { class: 'idea' + (m.picked[i] ? '' : ' off') },
         el('input', { type: 'checkbox', checked: m.picked[i], disabled: f.planSent, 'aria-label': 'Include ' + b.topic, style: { marginTop: '3px', flexShrink: 0, width: '20px', height: '20px', accentColor: 'var(--emerald)' },

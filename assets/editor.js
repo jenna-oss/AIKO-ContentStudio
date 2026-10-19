@@ -319,7 +319,7 @@
 
     /* --- Details ---------------------------------------------------------------- */
     function drawDetails() {
-      var rows = [['Opening line', v.hook ? '“' + v.hook + '”' : ''], [isClip ? 'Why it was cut' : 'What it argues', v.angle], ['Loan type', v.product], ['Made for', v.audience],
+      var rows = [['Opening line', v.hook ? '“' + v.hook + '”' : ''], [isClip ? 'Why it was cut' : 'What it argues', v.angle], ['Job', v.product], ['Niche', v.audience],
         ['Length', clock(v.duration || 0)], ['Finished', v.rendered_at ? A.fmtWhen(v.rendered_at) : ''], isClip && clip ? ['From', clip.take_name || 'your take'] : null]
         .filter(function (r) { return r && r[1]; });
       body.append(el('dl', { style: { margin: 0, display: 'grid', gridTemplateColumns: 'max-content 1fr', gap: '8px 16px', fontSize: '14px' } },

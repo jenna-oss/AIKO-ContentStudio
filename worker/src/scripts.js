@@ -60,8 +60,8 @@ function writePrompt(brief) {
   const bits = [
     brief.topic && `Topic: ${brief.topic}`,
     brief.angle && `What it argues: ${brief.angle}`,
-    brief.product && `Loan type: ${brief.product}`,
-    brief.audience && `Who it is for: ${brief.audience}`,
+    brief.product && `The job this video does: ${brief.product}`,
+    brief.audience && `The founder niche it speaks to: ${brief.audience}`,
     brief.evidence && `What we know: ${brief.evidence}`,
   ].filter(Boolean).join('\n');
 

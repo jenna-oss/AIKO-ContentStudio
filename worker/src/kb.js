@@ -185,7 +185,7 @@ export const KB_TOOLS = [
     input_schema: {
       type: 'object',
       properties: {
-        query: { type: 'string', description: 'What the video is about or the kind of opening wanted, in plain words — e.g. "investors waiting for rates to drop before buying".' },
+        query: { type: 'string', description: 'What the video is about or the kind of opening wanted, in plain words — e.g. "advisors who know they should post but never do".' },
         topic: { type: 'string', description: 'A topic to favour. Hooks tagged with or mentioning it rank higher.' },
         category: { type: 'string', description: 'e.g. "myth_busting", "contrarian", "cost_of_waiting".' },
         limit: { type: 'integer', description: 'Default 10, max 30.' },

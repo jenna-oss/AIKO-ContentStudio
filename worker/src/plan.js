@@ -5,7 +5,7 @@
  * Spec section 4D: session context is the current weekly goal, the number of
  * videos, what is locked, what has been rejected. It belongs in the planning
  * session and NOT in the retrieval corpus — nobody should ever retrieve
- * "5 videos, DSCR locked in slot 2" as though it were source material.
+ * "5 videos, the referral video locked in slot 2" as though it were source material.
  *
  * So the state is carried, not stored: the page sends it, the model mutates it
  * through tools, the Worker sends it back. The Worker stays stateless, which is
@@ -23,38 +23,49 @@ import {
 const MAX_VIDEOS = 12;
 const MAX_REJECTED = 40;
 const MAX_TEXT = 4000;
-const PRODUCTS = ['dscr', 'fix-and-flip', 'bridge', 'ground-up', 'portfolio', 'brrrr', 'multifamily'];
+/* A slot's `product` and `audience` keep the names they had when they held a
+ * loan type and broker/borrower, because the page, the render workflow and the
+ * videos table all carry them. In AIKO they hold the job the video does (the
+ * four-post rotation) and the founder niche it speaks to. */
+export const POST_TYPES = ['echo', 'reframe', 'tactic', 'door'];
+export const NICHES = ['m-and-a', 'cre', 'exit-planning', 'tax', 'lending', 'franchise', 'builders', 'recruiting', 'any'];
 
 const str = (v, max = 400) => (typeof v === 'string' ? v.trim().slice(0, max) : null);
 
 /* The opening line is used word for word as the video's first line, so it is
  * checked here, before it can be locked, rather than only flagged later by the
- * video pipeline. The pipeline's voice rules, plus the ways a lender's voice
- * slips in: plans were first written for Trilith, and a locked "Ours means..."
- * went straight into a video. */
+ * video pipeline. AIKO's voice rules: no hype, no relief, no follower counts, and
+ * none of the agency words the positioning bans unless the line is saying what
+ * this is not ("not a branding agency"). */
+const NEVER_WORDS = /\b(branding|campaigns?|marketing services|ads|content creation|retainers?)\b/i;
+const NAMING_WHAT_IT_IS_NOT = /\b(?:not|no|never|isn'?t|aren'?t|without)\b[^.?!]{0,40}\b(?:branding|campaigns?|marketing services|ads|content creation|retainers?)\b/i;
+
 const HOOK_RULES = [
-  [/\btrilith\b/i, 'it names Trilith'],
-  [/\bwe(?:'ll|'ve|'re)?\s+(?:fund|lend|financ|approv|close|offer)\w*|\bour\s+(?:rates?|loans?|programs?|terms|products?|lending|funding|money)\b|\bours\b/i, 'it speaks as a lender'],
-  [/\b(?:incredible|unbelievable|insane|crazy|mind-?blowing|game-?changer|jaw-?dropping)\b/i, 'it uses hype'],
+  [/\btrilith\b|\bbuy box\b/i, 'it names another brand'],
+  [/\b(?:incredible|unbelievable|insane|crazy|mind-?blowing|game-?changer|jaw-?dropping|revolutionary|10x|hack)\b/i, 'it uses hype'],
   [/\byou won'?t believe\b/i, 'it is clickbait'],
   [/\b(?:obviously|everyone knows|as we all know)\b/i, 'it talks down'],
-  [/\b(?:guarantee[ds]?|risk-?free|can'?t lose|will definitely|sure thing)\b/i, 'it promises the future'],
+  [/\b(?:guarantee[ds]?|risk-?free|can'?t lose|will definitely|sure thing|overnight)\b/i, 'it promises results'],
+  [/\b(?:overwhelm\w*|drowning|burn(?:ed|t)?[ -]?out|stress(?:ed|ful)?|struggl\w*)\b/i, 'it sells relief; sell the advantage'],
+  [/\bfollowers?\b|\bviral\b|\bviews\b/i, 'it chases followers or views; measure clients and conversations'],
   [/!/, 'it has an exclamation mark'],
 ];
 
-/* The first line has to name the money: a figure the viewer can picture, in
- * digits or in words. A hook that opens on a mechanism makes the video's
- * first job a rescue, which is not what this channel is for. */
-const MONEY = /[$£€]|\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b[\s\w-]{0,24}\b(?:percent|dollars?|points?|grand|figures|rent|income|deposit|equity|profit|cash|months?|weeks?|years?|deals?|flips?|doors?|units?)\b/i;
+/* The first line has to name something concrete the founder can picture: a
+ * time cost, a stretch of time, a client, a call, a deal. A line that is only
+ * a topic ("how to use AI for marketing") gives nobody a reason to stay. */
+const CONCRETE = /\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty|forty|fifty|hundred)\b|\b(?:minutes?|hours?|days?|weeks?|months?|years?|clients?|buyers?|owners?|calls?|deals?|referrals?|enquir(?:y|ies)|inquir(?:y|ies)|conversations?|meetings?|phone)\b/i;
 
 export const hookProblems = (line) => {
-  const problems = HOOK_RULES.filter(([re]) => re.test(line)).map(([, why]) => why);
-  if (!MONEY.test(String(line || ''))) problems.push('it does not name the money');
+  const text = String(line || '');
+  const problems = HOOK_RULES.filter(([re]) => re.test(text)).map(([, why]) => why);
+  if (NEVER_WORDS.test(text) && !NAMING_WHAT_IT_IS_NOT.test(text)) problems.push('it uses agency vocabulary (branding, campaigns, ads, content creation)');
+  if (!CONCRETE.test(text)) problems.push('it names nothing concrete: no time cost, client or call');
   return problems;
 };
 
 /* A source id was capped at 64 because chunk ids are UUIDs and 36 characters.
- * The agent cites URLs, which are longer, so every Trilith link in the first
+ * The agent cites URLs, which are longer, so every link in the first
  * exported plan was silently cut mid-slug — including one that still looked
  * like a whole URL, which is the worse failure: a dead link that reads as a
  * live one. Long enough for any real URL, and still bounded. */
@@ -93,8 +104,8 @@ export function normalisePlan(input) {
     slot.hook = str(s.hook, 400);
     slot.opening_line = str(s.opening_line, 400);
     slot.evidence = str(s.evidence, 800);
-    slot.product = PRODUCTS.includes(s.product) ? s.product : null;
-    slot.audience = ['broker', 'borrower'].includes(s.audience) ? s.audience : null;
+    slot.product = POST_TYPES.includes(s.product) ? s.product : null;
+    slot.audience = NICHES.includes(s.audience) ? s.audience : null;
     slot.source_ids = Array.isArray(s.source_ids)
       ? s.source_ids.map((id) => str(id, SOURCE_ID_MAX)).filter(Boolean).slice(0, 12) : [];
     slot.status = slot.topic ? 'locked' : 'empty';
@@ -144,7 +155,7 @@ export const PLAN_TOOLS = [
       type: 'object',
       properties: {
         count: { type: 'integer', description: `How many videos. 1 to ${MAX_VIDEOS}.` },
-        goal: { type: 'string', description: 'The stated aim for the batch, if they gave one. e.g. "build authority on DSCR".' },
+        goal: { type: 'string', description: 'The stated aim for the batch, if they gave one. e.g. "reach M&A advisors before Q1".' },
       },
       required: ['count'],
     },
@@ -159,10 +170,10 @@ export const PLAN_TOOLS = [
         slot: { type: 'integer', description: 'Which video, counting from 1.' },
         topic: { type: 'string', description: 'What the video is about, in one line.' },
         angle: { type: 'string', description: 'The specific argument it makes about that topic.' },
-        hook: { type: 'string', description: 'The opening line as it would be spoken, if it is settled. In the channel voice (The Buy Box): never as a lender, never naming Trilith, no hype.' },
+        hook: { type: 'string', description: 'The opening line as the narrator would say it, if it is settled. In AIKO\'s voice: short and declarative, then the turn; names something concrete; no hype, no relief, no agency words.' },
         evidence: { type: 'string', description: 'Why it is worth making, citing what a search returned.' },
-        product: { type: 'string', enum: PRODUCTS },
-        audience: { type: 'string', enum: ['broker', 'borrower'] },
+        product: { type: 'string', enum: POST_TYPES, description: 'The job this video does: echo, reframe, tactic or door.' },
+        audience: { type: 'string', enum: NICHES, description: 'The founder niche it speaks to; any if it is general.' },
         source_ids: {
           type: 'array', items: { type: 'string' },
           description: 'chunk_id or document_id values from search results supporting this.',
@@ -232,7 +243,7 @@ export function applyPlanTool(plan, name, input) {
     const problems = hook ? hookProblems(hook) : [];
     if (problems.length) {
       return {
-        error: `That opening line can't be locked as written: ${problems.join('; ')}. Rewrite it in The Buy Box's voice, show them the new wording, and lock it once they agree.`,
+        error: `That opening line can't be locked as written: ${problems.join('; ')}. Rewrite it in AIKO's voice, show them the new wording, and lock it once they agree.`,
       };
     }
 
@@ -243,8 +254,8 @@ export function applyPlanTool(plan, name, input) {
       hook: str(input.hook, 400),
       opening_line: str(input.hook, 400),
       evidence: str(input.evidence, 800),
-      product: PRODUCTS.includes(input.product) ? input.product : null,
-      audience: ['broker', 'borrower'].includes(input.audience) ? input.audience : null,
+      product: POST_TYPES.includes(input.product) ? input.product : null,
+      audience: NICHES.includes(input.audience) ? input.audience : null,
       source_ids: Array.isArray(input.source_ids)
         ? input.source_ids.map((id) => str(id, SOURCE_ID_MAX)).filter(Boolean).slice(0, 12) : [],
     };

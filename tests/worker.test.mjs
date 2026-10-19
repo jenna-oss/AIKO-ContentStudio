@@ -1051,5 +1051,21 @@ check('words in a cut section go, fixes apply, and later words move up',
 check('the hook is the sentence the clip opens on',
   openingSentence([{ t: 'Rates' }, { t: 'rose.' }, { t: 'Then' }]) === 'Rates rose.', '');
 
+/* The opening line is locked word for word, so AIKO's voice rules are checked
+ * at lock time. */
+const { hookProblems } = await import(pathToFileURL(join(here, '..', 'worker', 'src', 'plan.js')).href);
+check('an opening line in the AIKO voice locks',
+  hookProblems('Your buyers research you for a year before they call. Twenty minutes a month decides what they find.').length === 0, '');
+check('saying what AIKO is not may use an agency word',
+  hookProblems('Not a branding agency. A content system that runs on twenty minutes of your month.').length === 0, '');
+check('an opening line that sells relief is refused',
+  hookProblems('Struggling to keep up with social media?').some((p) => /relief/.test(p)), '');
+check('agency vocabulary is refused',
+  hookProblems('Stop paying for ads. Teach your clients instead.').some((p) => /agency vocabulary/.test(p)), '');
+check('follower counts are refused',
+  hookProblems('Grow to 10k followers in a month.').some((p) => /followers/.test(p)), '');
+check('a topic is not an opening line',
+  hookProblems('How to use AI for marketing.').some((p) => /nothing concrete/.test(p)), '');
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);
