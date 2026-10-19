@@ -27,7 +27,7 @@ Three documents, three jobs, so you know which to open:
                     │                         │
                     ▼                         ▼
         ┌───────────────────────────────────────────────┐
-        │        Cloudflare Worker  (trilith-ask)        │
+        │        Cloudflare Worker  (aiko-studio)        │
         │  holds every key · anon Supabase · CORS gate   │
         └───────────────────────────────────────────────┘
                     │                         │
@@ -52,12 +52,12 @@ whole reason the Worker exists.
 ```jsonc
 POST <WORKER_URL>/ideas
 {
-  "brief":       "what should we make about DSCR this week",
+  "brief":       "what should we make for M&A advisors this week",
   "history":     [ … up to 10 prior turns … ],
   "attachments": [ … images, PDFs, text staged in the composer … ],
   "session_id":  "plan-m1x8q2-7fa93b",
   "plan": {                       // the session, carried both ways
-    "goal": "build authority on DSCR",
+    "goal": "show advisors what a week of videos looks like",
     "target_count": 3,
     "slots": [ { "status": "locked", "topic": "…", "angle": "…" }, … ],
     "rejected": [ { "topic": "…", "reason": "…" } ]
@@ -90,8 +90,8 @@ Eighteen tools: twelve that search, five that move the session, one that propose
 | `search_competitor_ads` | `adspy` | keyword |
 | `count_ads` | `adspy` | exact count over every row |
 | `search_hook_patterns` | `adspy` | keyword |
-| `search_trilith_content` | `content` | keyword |
-| `trilith_coverage` | `content` | listing |
+| `search_aiko_content` | `content` | keyword |
+| `aiko_coverage` | `content` | listing |
 | `search_transcripts` | `kb` | **hybrid** |
 | `search_research` | `kb` | **hybrid** |
 | `search_previous_content` | `kb` | **hybrid** |
@@ -151,7 +151,7 @@ selector, and **Add to library**.
 
 ```jsonc
 POST <WORKER_URL>/kb/upload
-Authorization: Bearer <KB_UPLOAD_TOKEN>
+Authorization: Bearer <Clerk session token>
 {
   "name":          "episode-17.vtt",
   "text":          "WEBVTT\n\n00:20:40.000 --> …",
@@ -188,12 +188,12 @@ the planner retrieves, cites, and is instructed to trust.
 
 So the guard is two-deep:
 
-- **`KB_UPLOAD_TOKEN`** at the door. Unset → the route returns `503` rather than
-  running unguarded.
+- **Sign-in** at the door: a Clerk session whose email is in `kb.app_users`,
+  checked on every request, as for every route.
 - **The `upload:` namespace** in the database. Every uploaded document's
   `source_key` is forced into it, and `kb_upload_chunks` refuses any document
   outside it — so an uploader who somehow learned a harvested podcast's id still
-  cannot replace its chunks with words the planner would attribute to Trilith.
+  cannot replace its chunks with words the planner would attribute to AIKO.
 
 The second layer exists because the first is a shared secret, and shared secrets
 leak.
@@ -254,7 +254,7 @@ cd worker
 npx wrangler secret put ANTHROPIC_API_KEY
 npx wrangler secret put SUPABASE_ANON_KEY
 npx wrangler secret put VOYAGE_API_KEY     # optional
-npx wrangler secret put KB_UPLOAD_TOKEN    # optional
+npx wrangler secret put CLERK_SECRET_KEY
 npx wrangler deploy
 ```
 
@@ -266,7 +266,7 @@ every Supabase client app.
 | `SUPABASE_URL` or `SUPABASE_ANON_KEY` | `/ideas` returns `503` before doing anything, naming the specific binding that is unset |
 | `ANTHROPIC_API_KEY` | no precheck — the request reaches the SDK, comes back 401, and surfaces as "The API key is missing or invalid on the server" |
 | `VOYAGE_API_KEY` | searches still answer, keyword-only, every result flagged `degraded` |
-| `KB_UPLOAD_TOKEN` | `/kb/upload` returns `503`; the read path is unaffected |
+| `CLERK_SECRET_KEY` | every route answers `502`: sign-in cannot be checked |
 
 The asymmetry in the first two rows is real rather than intentional: the
 Supabase bindings are checked by name up front because a secret created with an
@@ -274,16 +274,6 @@ empty value looks present to `wrangler secret list`, and "one of these two is
 unset" sends you looking in the wrong place. `ANTHROPIC_API_KEY` never got the
 same treatment, so a missing one is diagnosed a round trip later.
 
-`KB_UPLOAD_TOKEN` is **not** issued by a vendor — you invent it. It is a shared
-secret: the same string sits in the Worker and is typed into the page once per
-browser, kept in `localStorage`. Generate one with
-
-```bash
-node -e "console.log(require('crypto').randomBytes(32).toString('base64url'))"
-```
-
-Rotating it costs each person one paste: the page clears its stored copy on a
-`401` and asks again.
 
 ### Repository secrets
 

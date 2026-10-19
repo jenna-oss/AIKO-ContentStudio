@@ -1,24 +1,24 @@
 /* ---------------------------------------------------------------------------
- * Refresh the educational-creators page: every creator's videos, and the
- * roster itself.
+ * Refresh the Creators page: the founder, marketing and personal-brand
+ * educators who teach AIKO's audience to win clients through content. Every
+ * creator's videos, and the roster itself.
  *
  * The page began as a one-time hand pass on 2026-08-17 and said so. This puts
  * it on the daily schedule the rest of the site runs on.
  *
  * Three things make this harder than the creative wall it is modelled on:
  *
- * 1. ORGANIC, NOT PAID. This is the exact inverse of pull-creatives.mjs. The
+ * 1. ORGANIC, NOT PAID. The Competitors page is the paid side. The
  *    page is about what these people post, so an ad must never appear on it.
  *    Paid rows carry an _AD-suffixed enum on platform/type; anything we cannot
  *    read is treated as PAID and dropped, which is the safe direction here and
  *    the opposite of the wall's default.
  *
  * 2. THE CORPUS DRIFTS OFF-THESIS. Spyglass returns a creator's recent posts,
- *    not their real estate posts. Sean Pan's most recent organic video on
- *    2026-09-08 was about tax-free shopping in Japan, followed by index funds
- *    and compound interest. A page premised on residential real estate
- *    investing cannot publish those, and no keyword rule reliably separates
- *    them, so every candidate video is screened by Claude before it lands.
+ *    not their posts on the subject. A founder-brand creator's latest video
+ *    can be about a gym routine or a holiday. No keyword rule reliably
+ *    separates those, so every candidate video is screened by Claude before
+ *    it lands.
  *
  * 3. HOOKS ARE SOMETIMES NULL. The card shows the hook as its only text, so a
  *    null would publish an empty card. We fall back to the caption's first
@@ -66,11 +66,13 @@ const MAX_CANDIDATES_CHECKED = 6;
  * value would render as a raw slug chip. */
 const PLATFORM_LABELS = { INSTAGRAM: 'Instagram', TIKTOK: 'TikTok', FACEBOOK: 'Facebook' };
 
-const PRODUCT_LINES = ['dscr', 'fix-and-flip', 'bridge', 'ground-up', 'portfolio', 'brrrr', 'multifamily'];
+/* The topic chips on creators.html. Stored under productLines, the field name
+ * the page and the roster file already use. */
+const PRODUCT_LINES = ['personal-brand', 'linkedin', 'short-video', 'ai-tools', 'sales', 'storytelling'];
 
 const DISCOVERY_QUERIES = [
-  'individual educator teaching residential real estate investing, rental property analysis and financing',
-  'creator explaining DSCR loans, BRRRR and fix and flip financing to investors',
+  'individual educator teaching founders and consultants to build a personal brand and win clients with content',
+  'creator teaching B2B service businesses to use LinkedIn, short-form video and AI tools to get clients',
 ];
 
 const KEY = String(process.env.SPYGLASS_API_KEY ?? '').trim();
@@ -214,13 +216,13 @@ function followerCount(b) {
 
 /* ------------------------------------------------------- relevance screen -- */
 
-const SCREEN_SYSTEM = `You screen short-form videos for an internal reference page about RESIDENTIAL REAL ESTATE INVESTING education.
+const SCREEN_SYSTEM = `You screen short-form videos for an internal reference page about how FOUNDERS AND EXPERT SERVICE BUSINESSES WIN CLIENTS WITH CONTENT.
 
-KEEP a video only if it teaches something about residential real estate investing or its financing: buying, financing, renting, renovating, or analysing residential investment property; loan programs such as DSCR, bridge, fix-and-flip, BRRRR, ground-up, portfolio or multifamily; deal numbers, cash flow, or qualification.
+KEEP a video only if it teaches something about that: building authority or a personal brand on social media, turning expertise into posts or videos, LinkedIn or short-form video for B2B, using AI tools to make content, writing hooks, storytelling, or turning an audience into clients and calls.
 
-DROP everything else, however popular: general personal finance, index funds, stocks, crypto, budgeting, travel, lifestyle, motivation, business coaching, commercial-only or land-only investing, and pure promotion of a course or a giveaway with no teaching in it.
+DROP everything else, however popular: fitness, travel, lifestyle, general motivation, investing, crypto, relationships, and pure promotion of a course or a giveaway with no teaching in it.
 
-Judge the video itself, not the creator's usual subject. Be strict: a video that merely mentions real estate in passing while teaching something else is a DROP.
+Judge the video itself, not the creator's usual subject. Be strict: a video that merely mentions content in passing while teaching something else is a DROP.
 
 Reply with JSON only: {"decisions":[{"id":"<id>","keep":true|false,"why":"<8 words max>"}]}. Include every id you were given, exactly once.`;
 
@@ -247,12 +249,25 @@ async function screen(items) {
 const existing = JSON.parse(await readFile(DATA, 'utf8'));
 const roster = existing.creators ?? [];
 
-const missingIds = roster.filter((c) => !c.spyglassId);
-if (missingIds.length) {
-  console.error(`These creators have no spyglassId and cannot be refreshed: ${missingIds.map((c) => c.name).join(', ')}`);
-  console.error('Resolve them once via the Spyglass creator search and pin the ids into data/education-creators.json.');
-  process.exit(1);
+/* A creator on the roster without a Spyglass id is resolved here by name, once,
+ * and the id is written back with the rest of the file. One that does not
+ * resolve keeps its place and is tried again tomorrow. */
+for (const c of roster.filter((x) => !x.spyglassId)) {
+  try {
+    const hits = await searchCreators(c.name);
+    const match = hits.find((b) => String(b?.name ?? '').trim().toLowerCase() === c.name.trim().toLowerCase());
+    if (match?.id) {
+      c.spyglassId = String(match.id);
+      console.log(`  resolved ${c.name} -> ${c.spyglassId}`);
+    } else {
+      console.log(`  ${c.name}: no exact name match in Spyglass yet`);
+    }
+  } catch (err) {
+    console.log(`  ${c.name}: could not resolve — ${err.message}`);
+  }
+  await sleep(PAUSE_MS);
 }
+const pinned = roster.filter((c) => c.spyglassId);
 
 const screenReady = hasKey();
 if (!screenReady) {
@@ -265,7 +280,7 @@ const harvest = new Map();
 const failures = [];
 let loggedShape = false;
 
-for (const c of roster) {
+for (const c of pinned) {
   try {
     const list = await creatorMedia(c.spyglassId);
     if (!loggedShape && list.length) {
@@ -283,7 +298,7 @@ for (const c of roster) {
   await sleep(PAUSE_MS);
 }
 
-if (!harvest.size) {
+if (pinned.length && !harvest.size) {
   console.error('Spyglass returned nothing for any creator. Keeping the existing page.');
   console.error(failures);
   process.exit(1);
@@ -380,16 +395,16 @@ if (screenReady && updated.length < MAX_ROSTER) {
         /* The editorial fields the hand pass wrote. A new card without them
          * would render an empty angle and no product chips. */
         const profile = await claudeJson({
-          system: `You describe a real estate education creator for an internal reference page.
+          system: `You describe a creator who teaches founders and expert service businesses to win clients with content, for an internal reference page.
 
 Reply with JSON only:
 {"angle":"<one sentence, max 40 words, on what this person teaches and how their content is distinctive>",
  "productLines":["<from: ${PRODUCT_LINES.join(', ')}>"],
- "audience":"borrower"|"investor"|"agent",
+ "audience":"founders"|"marketers"|"creators",
  "onThesis":true|false}
 
 productLines: only values from that list, only ones the videos actually evidence, at most three.
-onThesis: false if this person is not primarily a residential real estate investing educator.`,
+onThesis: false if this person is not primarily teaching people to win clients or build authority with content.`,
           user: `Creator: ${cand.name}\nFollowers: ${cand._followers.label ?? cand._followers.count}\n\nRecent on-thesis videos:\n${keep.map((v) => `- ${v.hook}`).join('\n')}`,
           maxTokens: 1024,
         });
@@ -416,8 +431,8 @@ onThesis: false if this person is not primarily a residential real estate invest
             : null,
           followers: cand._followers.label,
           angle: profile.angle ?? '',
-          productLines: lines.length ? lines : ['dscr'],
-          audience: profile.audience ?? 'investor',
+          productLines: lines.length ? lines : ['personal-brand'],
+          audience: profile.audience ?? 'founders',
           addedBy: 'auto',
           addedOn: new Date().toISOString().slice(0, 10),
           videos: keep.map(({ title, creator, ...v }) => v),
@@ -440,14 +455,19 @@ const creators = [...updated, ...added];
 const totalVideos = creators.reduce((n, c) => n + (c.videos?.length ?? 0), 0);
 
 if (!totalVideos) {
-  console.error('No videos on any card. Not writing.');
-  process.exit(1);
+  if (!pinned.length) {
+    /* Nothing resolved yet: still write, so ids that did resolve are kept. */
+    console.log('No creator has videos yet; writing the roster so resolved ids are kept.');
+  } else {
+    console.error('No videos on any card. Not writing.');
+    process.exit(1);
+  }
 }
 
 await mkdir(join(ROOT, 'data'), { recursive: true });
 await writeFile(DATA, `${JSON.stringify({
   fetchedAt: new Date().toISOString(),
-  note: 'Refreshed daily by .github/workflows/daily-creator-pull.yml. Videos are organic posts from the Spyglass corpus, screened for residential real estate relevance before publishing.',
+  note: 'Refreshed daily by .github/workflows/daily-creator-pull.yml. Videos are organic posts from the Spyglass corpus, screened for teaching founders to win clients with content before publishing.',
   creators,
   failures,
 }, null, 2)}\n`);

@@ -56,83 +56,82 @@ go through the same edit, approve and post steps.
 
 *The rest of this README is the technical reference.*
 
-## Competitive briefing
+## The system
 
-Competitive intelligence briefing on the private real estate lending category,
-prepared by [AIKO](https://aikogroup.io) for Trilith Funding.
+AIKO Content Studio is built by AIKO Group (@aikogroup.ai). AIKO also uses it
+for its own channel: the videos it makes advertise the tool to owner-operators
+of expertise-led, high-ticket businesses — M&A advisors, business brokers, CRE
+brokers, CPAs.
 
-`briefing.html` is a self-contained page — no build step, no dependencies. Open it
-directly, or serve the repo root with any static host.
+| Part | Where |
+|---|---|
+| Pages | static HTML on GitHub Pages, https://jenna-oss.github.io/AIKO-ContentStudio/ |
+| Worker | Cloudflare Worker `aiko-studio`, https://aiko-studio.jenna-cbd.workers.dev (`worker/`) |
+| Database | Supabase project `kgagmkodufrmxrafthre`; schema in `supabase/migrations/`, see [db/README.md](db/README.md) |
+| Sign-in | Clerk; the Worker only answers emails on the allowlist in `kb.app_users` |
+| Jobs | GitHub Actions workflows in `.github/workflows/` |
+| Video | the render pipeline in `video/`, see [video/README.md](video/README.md) |
 
-### What it covers
+The pages are public files. The lock is the Worker: every route needs a Clerk
+session whose email is in `kb.app_users`.
 
-- **The board** — five competing lenders (Kiavi, Lima One, Visio, Anchor Loans,
-  New Silver) with paid presence, landing page count, social reach, and the
-  position each is buying.
-- **The creative wall** — 21 live and recently-live ad creatives, verbatim, each
-  linking to the asset that ran. Filterable by lender.
-- **Hook taxonomy** — the nine angles the category advertises on, ordered by how
-  heavily it leans on each.
-- **Pain map** — ten borrower pains scored by competitive pressure.
-- **Conversion** — button text, landing page destinations, and offer mechanics.
-- **Where the room is** — seven positions nobody in the category has taken.
+**The scheduled workflows are switched off.** The ad pull, the creator pull, the
+knowledge-base refresh and the weekly hook-pattern refresh all have their
+`schedule:` blocks commented out until the repository secrets are added. Each
+can still be run by hand from the Actions tab (`workflow_dispatch`). The times
+given below are what each runs at once its schedule is restored.
 
-### Sourcing
+## Research
 
-Drawn from the Spyglass advertising corpus (Meta, Instagram, TikTok), cross-read
-against each lender's live site and landing pages. 130 creatives across five
-brands, trailing 90 days to August 2026.
+The Research menu has two pages.
 
-Three limits are stated on the page itself and repeated here:
+- **Competitors** (`competitors.html`) — what AI content tools, video and
+  scheduling apps and agencies advertise on Meta. Harvested daily from the Meta
+  Ad Library by `tools/pull.mjs` and classified by category: `ai-video`,
+  `ai-writing`, `scheduling`, `repurposing`, `all-in-one`, `agency`. The page
+  reads `data/ads.json` directly; nothing goes through the Worker.
+- **Creators** (`creators.html`) — founder and marketing educators, via
+  Spyglass. Needs `SPYGLASS_API_KEY` and an active Spyglass subscription. See
+  [Creator automation](#creator-automation).
 
-1. **Days-in-market is a proxy, not a metric.** Platforms do not publish spend or
-   performance figures. A long-running ad is probably working; it is not proof.
-2. **Absence is not proof of absence.** A brand returning no results means no
-   indexed paid social — not that no marketing exists.
-3. **The Spanish-language demand signal needs validating.** It comes from creator
-   accounts whose audience geography is not verified in this data.
+Two limits apply to both, and the Competitors page states them itself: the Ad
+Library reports creatives, never spend, so ad count is not spend; and absence
+means not observed, not that nothing exists.
 
-## Ask the corpus (chat)
+## The Worker
 
-`ask.html` is a chat interface over the tracked ads, backed by a Cloudflare Worker
-(`worker/`) that holds the Anthropic API key. The key never reaches the browser.
-
-**There is deliberately no retrieval layer.** The whole corpus — 774 ads, ~70K
-tokens — fits inside the context window, so every question is answered against
-every ad rather than against whatever a search step happened to surface. Prompt
-caching (1-hour TTL) makes the repeat cost of that small: the corpus sits in a
-cached system prefix and only the question is billed at full rate.
-
-### Deploying the backend
+`worker/` holds every key. The pages hold none — they know the Worker's URL and
+nothing else. The Worker answers the planner (`/ideas`), knowledge-base uploads
+(`/kb/upload`), plans, renders, edits, recordings, links and scheduled posts,
+and runs every five minutes on a cron trigger to publish anything due on
+Instagram or Facebook.
 
 ```
 cd worker
 npm install
-npx wrangler secret put ANTHROPIC_API_KEY   # prompts — never type the key into a file
+npx wrangler secret put ANTHROPIC_API_KEY   # prompts — never type a key into a file
+npx wrangler secret put SUPABASE_ANON_KEY
 npx wrangler deploy
 ```
 
-Then set `WORKER_URL` at the top of the script in `ask.html` to the deployed URL
-and commit. Until that constant is set, the page loads and shows setup instructions
-rather than failing.
+The full list of secrets, and what each one is for, is in the comments of
+`worker/wrangler.toml`. `SUPABASE_URL` and `GITHUB_REPO` are `[vars]` there, not
+secrets. What breaks when a secret is missing is in [PLAN-PAGE.md](PLAN-PAGE.md).
 
 ### Guards
 
-- **Origin allowlist** — the Worker only answers requests from the Pages origin.
-  It holds a spendable API key, so an open endpoint would let anyone use it.
-- **Input caps** — 2,000 characters per question, 12 turns of history.
-- **Refusals handled** — `stop_reason: "refusal"` is surfaced as a readable message,
-  and server-side fallbacks are enabled so a declined request reroutes automatically.
-- **Token usage is shown per answer** so cost stays visible rather than invisible.
+- **Sign-in on every route** — a Clerk session on the `kb.app_users` allowlist.
+- **Origin allowlist** — the Worker only answers browsers on the Pages origin
+  and local development ports. It is a browser control, not a security
+  boundary, which is why sign-in exists.
+- **Read-only database key** — the Worker reads Supabase with the anon key, so
+  the planner cannot rewrite a corpus. The service-role key belongs in
+  repository secrets and never in the Worker.
+- **Refusals handled** — `stop_reason: "refusal"` is surfaced as a readable
+  message.
 
-### What it cannot do
-
-Spyglass is an authenticated connector tied to a Claude account, not a public API,
-so the chat cannot query it live. It reads the corpus snapshot that the daily job
-maintains — same data, refreshed on a schedule.
-
-**A public endpoint spends real money.** Add a Cloudflare rate-limiting rule on the
-Worker route before sharing the link widely.
+**A public endpoint spends real money.** Add a Cloudflare rate-limiting rule on
+the Worker route before sharing the link widely.
 
 ## Knowledge base
 
@@ -142,21 +141,34 @@ library. It is the only corpus here with a vector layer — hybrid retrieval,
 reranked and diversity-filtered — and it is what the planning agent searches
 when it needs to know what has already been said, written, or read.
 
-Drop files in `kb/files/`, add URLs to `kb/sources.json`, then:
+Drop files in `kb/files/`, add URLs to `kb/sources.json`, add feeds to
+`kb/feeds.json`, then:
 
 ```
 npm run kb
 ```
 
+`kb/feeds.json` follows Seth's Blog, SaaStr, Sahil Bloom, Lenny's Newsletter,
+ACG, IBBA, Peak Business Valuation, Commercial Observer, Connect CRE, Bisnow,
+The Verge (AI), MIT Technology Review (AI), OpenAI News and Google AI. Each run
+fetches their newest posts, bounded per feed.
+
+The planner's other corpora are the competitor ads (`adspy`), AIKO's own
+content (`content` — read from gitignored Markdown in `content/own/`, or from a
+site's sitemap once `OWN_SITE_SITEMAP` is set) and hook patterns from founder
+and creative creators via Spyglass. The positioning lives only in
+`content/own/`, never in this public repository.
+
 Full documentation, including the ranking formula, what is deliberately
 switched off and why, and the limits of the data:
-[KNOWLEDGE-BASE.md](KNOWLEDGE-BASE.md). How the Plan page, the Worker and
-Postgres connect — the request path, the twelve tools, the streaming protocol,
-and every secret and what breaks without it: [PLAN-PAGE.md](PLAN-PAGE.md). How to
+[KNOWLEDGE-BASE.md](KNOWLEDGE-BASE.md). The ad, content and hook-pattern
+corpora: [RETRIEVAL.md](RETRIEVAL.md). How the Plan page, the Worker and
+Postgres connect — the request path, the tools, the streaming protocol, and
+every secret and what breaks without it: [PLAN-PAGE.md](PLAN-PAGE.md). How to
 get material in: [kb/README.md](kb/README.md).
 
-Refreshed daily at 14:00 UTC by `.github/workflows/knowledge-base.yml`, which
-writes only to Postgres and never to git.
+Refreshed daily at 14:00 UTC by `.github/workflows/knowledge-base.yml` (off for
+now, see above), which writes only to Postgres and never to git.
 
 Needs `VOYAGE_API_KEY` alongside the Supabase secrets, as a repository secret
 and as a Worker secret. **Without it the system still answers**, using keyword
@@ -165,16 +177,20 @@ partial rather than concluding nothing exists.
 
 ## Daily automation
 
-`.github/workflows/daily-ad-pull.yml` runs at 11:00 UTC (06:00 ET) and can also be
-triggered by hand from the Actions tab. Three stages:
+`.github/workflows/daily-ad-pull.yml` runs at 11:00 UTC (06:00 ET) once its
+schedule is restored, and can be triggered by hand from the Actions tab.
 
 | Stage | Script | Does |
 |---|---|---|
-| Pull | `tools/pull.mjs` | Drives Chromium over 4 keyword sweeps and 9 lender page IDs, writes `data/raw/<date>.json` |
-| Merge | `tools/merge.mjs` | Folds into `data/ads.json`, stamping a **firstSeen** date per ad |
-| Render | `tools/render.mjs` | Rewrites only the `AUTO:*` regions of `briefing.html` |
+| Pull | `tools/pull.mjs` | Drives Chromium over keyword sweeps, two phrasings per category, and writes `data/raw/<date>.json` |
+| Merge | `tools/merge.mjs` | Folds into `data/ads.json`, stamping a **firstSeen** date per ad and keeping the category of the sweep that first found it |
+| Shape | `tools/to-sql.mjs` | Turns `data/ads.json` into the load payload for Postgres |
+| Content | `tools/pull-content.mjs` | Re-harvests AIKO's own content; allowed to fail without sinking the ad pull |
 
-Then it commits and pushes; Pages rebuilds itself.
+Then it commits and pushes — GitHub Pages rebuilds, and the Competitors page
+reads the new `data/ads.json` — and only after that sends the ads and content
+to Supabase (`tools/push-supabase.mjs`, `tools/push-content.mjs`). Git is the
+source of truth; a database problem must never cost the day's harvest.
 
 **Why `firstSeen` matters.** Meta reports when an ad *started* but offers no recency
 sort, and its date filter matches ads *active during* a window rather than *started*
@@ -183,32 +199,23 @@ new to us — which is both honest and more useful than anything a single query 
 
 ### Guards
 
-Publishing is automatic, so two things are gated:
+Publishing is automatic, so the harvest is gated:
 
 - **Unhealthy harvest fails the run.** `pull.mjs` exits non-zero unless it finds at
   least 15 ads and at least 2 keyword sweeps returned rows. A blocked or broken run
   commits nothing and leaves the previous good data and page in place. A page-ID
-  target returning zero is *not* treated as failure — six lenders genuinely have no
-  ads.
-- **Render refuses to shrink the page.** If the output is under 60% of the input it
-  aborts, on the assumption something outside the markers got clobbered.
-
-The feed section also shows a staleness warning on the page itself if the last
-successful run is more than three days old.
+  target returning zero, once any are added, is *not* treated as failure — a
+  company that never advertises is data.
+- **Push retries on a moving branch.** A commit landing mid-run is rebased onto
+  rather than lost.
 
 ### Known risk
 
 Meta frequently challenges datacenter IPs and a headless runner cannot clear a
-challenge, so expect some failed runs. Failures are safe — they just skip a day. If
-it fails for several consecutive days, run the job somewhere with a residential IP,
-or use `tools/recency-pull.js` by hand in the meantime.
-
-### Careful: two writers touch briefing.html
-
-`render.mjs` writes the `AUTO:FEED` region. Regenerating the whole page from the
-design source overwrites that region with the placeholder. If you regenerate the
-page, run `node tools/render.mjs` afterwards to restore the feed — it is idempotent
-and safe to run any time `data/ads.json` exists.
+challenge, so expect some failed runs. Failures are safe — they just skip a day.
+Keyword depth is also capped for datacenter IPs: a runner sees roughly a quarter of
+what a residential connection does. If it fails for several consecutive days, run
+the job somewhere with a residential IP.
 
 ### Running it locally
 
@@ -224,39 +231,40 @@ path. CI does not need this.
 
 ## Creator automation
 
-`.github/workflows/daily-creator-pull.yml`, 13:00 UTC daily, an hour after the ad
-pull so the two do not race for the same push. `creators.html` fetches its JSON in
-the browser, so there is no render step — rewriting the data files is the publish.
+`.github/workflows/daily-creator-pull.yml`, 13:00 UTC daily once its schedule is
+restored, two hours after the ad pull so the two do not race for the same push.
+`creators.html` fetches its JSON in the browser, so there is no render step —
+rewriting the data files is the publish.
 
 | Stage | Script | Does |
 |---|---|---|
-| Harvest | `tools/pull-creators.mjs` | Organic clips per pinned creator, relevance screen, discovery |
-| Mine | `tools/creator-hooks.mjs` | Rebuilds the hook library from that day's hooks |
+| Harvest | `tools/pull-creators.mjs` | Organic clips per pinned creator, relevance screen, discovery; writes `data/education-creators.json` |
+| Mine | `tools/creator-hooks.mjs` | Rebuilds the hook library (`data/creator-hook-patterns.json`) from that day's hooks |
 
-Needs `SPYGLASS_API_KEY` and `ANTHROPIC_API_KEY` as repository secrets. Each script
-skips itself, without failing, when its key is absent.
+Needs `SPYGLASS_API_KEY` (on an active Spyglass subscription) and
+`ANTHROPIC_API` as repository secrets; the workflow maps the second to the
+`ANTHROPIC_API_KEY` the scripts read. Each script skips itself, without failing,
+when its key is absent.
 
 ### Why this one needs a model
 
 Two judgments on this page cannot be made with a keyword rule.
 
 **The corpus drifts off-thesis.** Spyglass returns a creator's *recent* posts, not
-their *real estate* posts. On 2026-09-08, Sean Pan's most recent organic videos were
-tax-free shopping in Japan, index funds, and compound interest — none of them
-publishable on a page premised on residential real estate investing. Every candidate
-clip is screened before it lands, and without the Anthropic key the harvest keeps the
-existing clips rather than publishing unscreened ones.
+their posts on the subject. A founder-brand creator's latest video can be about a
+gym routine or a holiday. Every candidate clip is screened before it lands, and
+without the Anthropic key the harvest keeps the existing clips rather than
+publishing unscreened ones.
 
 **Spyglass has no pattern data for organic posts.** Its `HOOK`/`AD_ANGLE` aggregation is
-tuned to paid campaigns and comes back empty for these creators, which is why the
-library was hand-mined at first. `creator-hooks.mjs` reproduces that reading each run.
+tuned to paid campaigns and comes back empty for organic creators.
+`creator-hooks.mjs` reads the hooks from the harvested clips instead, each run.
 
 ### Guards
 
-- **Organic only, strictly.** The inverse of `pull-creatives.mjs`, and stricter: a row
-  whose paid/organic marker cannot be read is treated as **paid** and dropped. The
-  creative wall assumes the opposite, because there a misread costs one card and here
-  it puts an ad on a page about what people post for free.
+- **Organic only, strictly.** A row whose paid/organic marker cannot be read is
+  treated as **paid** and dropped. The Competitors page is the paid side; an ad
+  must never appear on a page about what people post for free.
 - **Clips are replaced, never emptied.** A creator whose harvest fails, or who has
   fewer than two on-thesis clips that day, keeps yesterday's. An empty card is worse
   than a stale one.
@@ -286,33 +294,29 @@ the job runs without it.
 ### Cost
 
 Spyglass bills credits per row returned. The ceiling is 12 rows per creator per day
-against a roster capped at 16. The hook-pattern job stayed *weekly* for this reason,
-so if credits get tight, this schedule is the first thing to loosen.
+against a roster capped at 16. The hook-pattern job (`weekly-hook-patterns.yml`,
+Mondays 12:00 UTC once restored) stayed *weekly* for this reason, so if credits get
+tight, this schedule is the first thing to loosen.
 
 ## Tools
 
-`tools/recency-pull.js` — a no-install version of the same sweep for ad-hoc checks,
-pasted into the browser console.
+The scripts the workflows run live in `tools/`, grouped by job:
+
+| Job | Scripts |
+|---|---|
+| Ad corpus | `pull.mjs`, `merge.mjs`, `to-sql.mjs`, `push-supabase.mjs` |
+| AIKO's own content | `pull-content.mjs`, `push-content.mjs` |
+| Creators and hooks | `pull-creators.mjs`, `creator-media.mjs`, `creator-hooks.mjs`, `hook-verify.mjs` |
+| Hook patterns | `pull-spyglass.mjs`, `push-hook-patterns.mjs` |
+| Knowledge base | `kb-ingest.mjs`, `kb-process.mjs`, `kb-feeds.mjs`, `kb-sources.mjs`, `kb-web.mjs`, `kb-chunk.mjs`, `kb-summarise.mjs`, `kb-mirror-published.mjs`, `kb-mirror-videos.mjs`, `kb-seed-hooks.mjs`, `kb-embed-hooks.mjs`, `kb-lib.mjs` |
+| Shared | `claude-json.mjs` |
 
 Meta's Ad Library has **no recency sort**. Keyword searches are forced to
 `sort_data[mode]=total_impressions`, and passing `creation_time` is silently
 overridden back to impressions. Its date filter matches ads *active during* a
-window rather than ads that *started* in it, so long-running 2024 ads still
-surface inside a 2026 window.
-
-The script works around that: it scrolls the results, reads the "Started running
-on" date off each ad, de-duplicates creative variants, sorts newest-first, and
-copies a CSV to the clipboard. It has to run in the browser console — the Ad
-Library is a JavaScript app and returns an empty shell to `curl`.
-
-Usage, the working search URLs, and pre-resolved lender page IDs are in the file
-header. Last verified 2026-08-15: 29 unique ads across 27 advertisers in a single
-sweep, 7 of them started within the prior 45 days.
-
-## Notes
-
-- Figures and metrics use a monospace face; competitor ad copy is set in serif
-  italic to mark it as quoted material rather than authored copy.
-- The page renders in both light and dark themes.
-- Typography falls back through `Poppins → Century Gothic → Avenir Next`. Poppins
-  is not bundled, so install it locally for the intended rendering.
+window rather than ads that *started* in it, so long-running ads from earlier
+years still surface inside a current window. `pull.mjs` works around that: it
+scrolls the results and reads each ad's Library ID and "Started running on"
+date, so ordering by start date happens on our side. It has to drive a real
+browser — the Ad Library is a JavaScript app and returns an empty shell to
+`curl`.

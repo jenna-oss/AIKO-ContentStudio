@@ -1,0 +1,204 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<meta name="robots" content="noindex, nofollow">
+<title>Competitors — Content studio</title>
+<script src="./assets/theme.js"></script>
+<script src="./assets/auth.js"></script>
+<link rel="stylesheet" href="./assets/app.css">
+<style>
+  .lede { max-width: 46rem; }
+  .stats { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); border-top: 1.5px solid var(--rule); border-bottom: 1.5px solid var(--rule); }
+  .stats > div { padding: 18px 16px 16px 0; }
+  .stats > div + div { padding-left: 16px; border-left: 1.5px solid var(--rule); }
+  .stat-n { font-family: var(--serif); font-size: 44px; line-height: .95; color: var(--ink); }
+  .stat-l { font-family: var(--mono); font-size: 11px; font-weight: 500; letter-spacing: .2em; text-transform: uppercase; color: var(--quiet); margin-top: 8px; }
+  @media (max-width: 640px) {
+    .stats { grid-template-columns: 1fr 1fr; }
+    .stats > div:nth-child(3) { padding-left: 0; border-left: 0; }
+    .stats > div:nth-child(n+3) { border-top: 1.5px solid var(--rule); }
+  }
+  .two { display: grid; grid-template-columns: minmax(0, 1fr) 280px; gap: 32px; align-items: start; }
+  @media (max-width: 900px) { .two { grid-template-columns: 1fr; } .two aside { order: -1; } }
+  .ad { padding: 18px 20px; display: flex; flex-direction: column; gap: 8px; }
+  .ad + .ad { border-top: 0; }
+  .ad-head { display: flex; gap: 10px; align-items: baseline; flex-wrap: wrap; }
+  .ad-name { color: var(--ink); font-weight: 600; }
+  .ad-copy { font-family: var(--serif); font-style: italic; font-size: 19px; line-height: 1.3; color: var(--ink); margin: 0; overflow-wrap: anywhere; }
+  .ad-meta { font-family: var(--mono); font-size: 12px; letter-spacing: .04em; color: var(--quiet); display: flex; gap: 14px; flex-wrap: wrap; }
+  .tops { list-style: none; margin: 0; padding: 0; }
+  .tops li { display: flex; justify-content: space-between; gap: 12px; padding: 9px 0; border-top: 1.5px solid var(--rule); font-size: 14px; }
+  .tops li:first-child { border-top: 0; }
+  .tops button { background: none; border: 0; padding: 0; color: var(--ink); text-align: left; font: inherit; cursor: pointer; text-decoration: underline; text-decoration-color: var(--rule); text-underline-offset: 3px; }
+  .tops .n { font-family: var(--mono); color: var(--quiet); }
+  .limits { font-size: 13px; color: var(--quiet); max-width: 46rem; }
+  .limits li { margin: 4px 0; }
+  .search { width: 100%; max-width: 360px; min-height: 40px; border: 1px solid var(--strong); background: var(--field); color: var(--ink); padding: 0 12px; }
+  .warn-line { background: var(--warn-bg); color: var(--warn-ink); padding: 8px 12px; font-size: 14px; }
+</style>
+</head>
+<body>
+
+<main class="page">
+  <div>
+    <span class="eyebrow">Research</span>
+    <h1>Competitors</h1>
+  </div>
+  <p class="lede quiet" style="font-size:15px">What AI content tools, video and scheduling apps, and agencies are telling founders on Meta right now. Swept from the Meta Ad Library; each ad's category is the search that found it.</p>
+  <p class="warn-line" id="stale" hidden></p>
+  <div class="stats" id="stats" hidden></div>
+  <div class="row" id="cats" role="group" aria-label="Filter by category" hidden></div>
+  <p class="quiet" id="state">Loading the ad corpus…</p>
+  <div class="two" id="body" hidden>
+    <section>
+      <div class="row" style="justify-content:space-between; margin-bottom:12px">
+        <input class="search" id="q" type="search" placeholder="Search the copy" aria-label="Search the ad copy">
+        <span class="quiet" id="count"></span>
+      </div>
+      <div id="ads"></div>
+      <div class="row" style="justify-content:center; margin-top:16px"><button type="button" class="btn btn-s" id="more" hidden>Show more</button></div>
+    </section>
+    <aside>
+      <span class="eyebrow">Most ads, this view</span>
+      <ul class="tops" id="tops" style="margin-top:10px"></ul>
+    </aside>
+  </div>
+  <ul class="limits">
+    <li>Ad count is not ad spend. The Ad Library reports creatives, never budget.</li>
+    <li>"New" means new to these sweeps in the last seven days, not when Meta says it started. The first sweep is a baseline and is never counted as new.</li>
+    <li>Absence here means not observed on Meta, not that it does not exist. Keyword sweeps from a datacenter IP see only part of what a home connection does.</li>
+  </ul>
+</main>
+
+<script src="./assets/shell.js"></script>
+<script>
+/* The paid side of the market AIKO sells into, read straight from the corpus
+   the daily ad pull commits (data/ads.json). Nothing here goes through the
+   Worker: the corpus is public ad copy and the page is static. */
+const A = AikoApp;
+const el = A.el;
+A.header('research');
+
+const CATEGORY = {
+  'ai-video': 'AI video', 'repurposing': 'Repurposing', 'ai-writing': 'AI writing',
+  'scheduling': 'Scheduling', 'all-in-one': 'All-in-one', 'agency': 'Agencies',
+};
+const PAGE = 40;
+const DAY = 86400000;
+
+let ads = [];
+let baselineDay = null;
+let cat = 'all';
+let who = null;
+let shown = PAGE;
+
+const fmt = (iso) => {
+  if (!iso) return '';
+  const d = new Date(iso.length === 10 ? iso + 'T12:00:00' : iso);
+  return isNaN(d) ? String(iso) : d.toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' });
+};
+const isNew = (a) => a.firstSeen && a.firstSeen !== baselineDay && (Date.now() - new Date(a.firstSeen + 'T12:00:00')) < 7 * DAY;
+
+function stat(n, label) {
+  return el('div', {}, el('div', { class: 'stat-n', text: n }), el('div', { class: 'stat-l', text: label }));
+}
+
+function current() {
+  const q = document.getElementById('q').value.trim().toLowerCase();
+  return ads.filter((a) => (cat === 'all' || a.category === cat)
+    && (!who || a.advertiser === who)
+    && (!q || `${a.copy} ${a.advertiser}`.toLowerCase().includes(q)));
+}
+
+function drawCats() {
+  const box = document.getElementById('cats');
+  box.replaceChildren();
+  const counts = {};
+  ads.forEach((a) => { const k = a.category || 'other'; counts[k] = (counts[k] || 0) + 1; });
+  const keys = ['all', ...Object.keys(CATEGORY).filter((k) => counts[k]), ...(counts.other ? ['other'] : [])];
+  keys.forEach((k) => {
+    const n = k === 'all' ? ads.length : counts[k];
+    const label = k === 'all' ? 'All' : (CATEGORY[k] || 'Untagged');
+    box.append(el('button', {
+      type: 'button', class: 'chip chip-sm', 'aria-pressed': String(cat === k),
+      onclick: () => { cat = k; who = null; shown = PAGE; drawCats(); draw(); },
+    }, `${label} · ${n}`));
+  });
+  box.hidden = false;
+}
+
+function draw() {
+  const list = current();
+  const box = document.getElementById('ads');
+  box.replaceChildren();
+  document.getElementById('count').textContent = `${A.plural(list.length, 'ad')}${who ? ` from ${who}` : ''}`;
+
+  if (!list.length) {
+    box.append(A.empty('No ads match this view.', who ? 'Show every advertiser' : null, () => { who = null; draw(); }));
+  }
+  list.slice(0, shown).forEach((a) => {
+    box.append(el('article', { class: 'card ad' },
+      el('div', { class: 'ad-head' },
+        el('span', { class: 'ad-name', text: a.advertiser }),
+        a.category ? el('span', { class: 'tag', text: CATEGORY[a.category] || a.category }) : null,
+        isNew(a) ? el('span', { class: 'tag warn', text: 'New' }) : null),
+      a.copy ? el('p', { class: 'ad-copy', text: `“${a.copy}”` }) : el('p', { class: 'quiet', text: 'No copy captured for this one.' }),
+      el('div', { class: 'ad-meta' },
+        a.started ? el('span', { text: `Running since ${fmt(a.started)}` }) : null,
+        el('span', { text: `Seen ${A.plural(a.seenCount || 1, 'day')}` }),
+        el('a', { href: `https://www.facebook.com/ads/library/?id=${encodeURIComponent(a.libraryId)}`, target: '_blank', rel: 'noopener', text: 'Open in the Ad Library ↗' }))));
+  });
+  const more = document.getElementById('more');
+  more.hidden = list.length <= shown;
+  more.onclick = () => { shown += PAGE; draw(); };
+
+  const tally = {};
+  list.forEach((a) => { tally[a.advertiser] = (tally[a.advertiser] || 0) + 1; });
+  const tops = document.getElementById('tops');
+  tops.replaceChildren();
+  Object.entries(tally).sort((x, y) => y[1] - x[1]).slice(0, 12).forEach(([name, n]) => {
+    tops.append(el('li', {},
+      el('button', { type: 'button', text: name, 'aria-pressed': String(who === name), onclick: () => { who = who === name ? null : name; shown = PAGE; draw(); } }),
+      el('span', { class: 'n', text: String(n) })));
+  });
+}
+
+fetch('./data/ads.json', { cache: 'no-cache' })
+  .then((r) => (r.ok ? r.json() : null))
+  .then((corpus) => {
+    const state = document.getElementById('state');
+    const all = corpus && corpus.ads ? Object.values(corpus.ads) : [];
+    if (!all.length) {
+      state.replaceWith(A.empty('No sweep has run yet. The daily ad pull fills this page once its schedule is on.'));
+      return;
+    }
+    baselineDay = corpus.baselineDay || null;
+    ads = all.sort((x, y) => String(y.firstSeen).localeCompare(String(x.firstSeen))
+      || String(y.started ? new Date(y.started).toISOString() : '').localeCompare(String(x.started ? new Date(x.started).toISOString() : '')));
+
+    const advertisers = new Set(ads.map((a) => a.advertiser)).size;
+    const fresh = ads.filter(isNew).length;
+    const stats = document.getElementById('stats');
+    stats.append(stat(ads.length.toLocaleString(), 'Ads tracked'), stat(advertisers.toLocaleString(), 'Advertisers'),
+      stat(fresh.toLocaleString(), 'New this week'), stat(fmt(corpus.updatedAt).replace(/, \d{4}$/, ''), 'Last sweep'));
+    stats.hidden = false;
+
+    const age = (Date.now() - new Date(corpus.updatedAt)) / DAY;
+    if (age > 3) {
+      const stale = document.getElementById('stale');
+      stale.textContent = `The last sweep was ${Math.floor(age)} days ago, so this is not current. Check the Daily ad pull workflow.`;
+      stale.hidden = false;
+    }
+
+    state.remove();
+    document.getElementById('body').hidden = false;
+    document.getElementById('q').addEventListener('input', () => { shown = PAGE; draw(); });
+    drawCats();
+    draw();
+  })
+  .catch(() => { document.getElementById('state').textContent = 'Couldn’t load the ad corpus.'; });
+</script>
+</body>
+</html>

@@ -1,8 +1,10 @@
-# Trilith Marketing Tool — design brief
+# AIKO Content Studio — design brief
 
-Built by **AIKO** (aikogroup.io) for the client **Trilith Funding**, a private
-real estate lender financing investors — fix-and-flip, bridge, DSCR, ground-up,
-BRRRR, multifamily.
+Built by **AIKO Group** (@aikogroup.ai) as a self-serve tool that turns one
+planning conversation into a week of finished, faceless, on-brand educational
+videos. AIKO uses it to make the videos that advertise the tool itself, aimed at
+owner-operators of expertise-led, high-ticket businesses — M&A advisors,
+business brokers, CRE brokers, CPAs.
 
 This document is the handoff for design work. Part 1 records the system as it
 exists today so new work matches it. Parts 2 and 3 specify two sections that do
@@ -11,16 +13,25 @@ not exist yet and need designing.
 Everything in Part 1 is extracted from the live code, not from memory. Every
 value is real and currently in use.
 
+> **Status.** This brief predates the AIKO rebuild. The two sections it
+> specifies now exist (`videos.html`, `output.html`), the Competitors page
+> (`competitors.html`) replaced the briefing, and the pages are restyled in the
+> AIKO brand system in `assets/app.css` — Electric `#3150FD`, Tangerine
+> `#FC3D05`, Instrument Serif, Public Sans and IBM Plex Mono — under the same
+> token names. The hex values and the Poppins stack in Part 1 are the original
+> build's; read `assets/app.css` for the current ones.
+
 ---
 
 ## 0. What the product is
 
-An internal tool, not a public marketing site. Two audiences: AIKO strategists
-and Trilith's marketing lead. It is `noindex, nofollow` and unlisted.
+A signed-in tool, not a public marketing site. Its users are on the allowlist
+in `kb.app_users`. It is `noindex, nofollow` and unlisted.
 
 It does three jobs today:
 
-1. **Shows** what every competing lender is advertising, refreshed daily.
+1. **Shows** what AI content tools, video and scheduling apps and agencies are
+   advertising, refreshed daily.
 2. **Answers** questions about that data, grounded and cited.
 3. **Plans** batches of short-form video concepts, which a human confirms before
    they are locked.
@@ -239,23 +250,25 @@ Do not design only the happy path. All of these will occur:
 
 ### 2.5 What already exists to connect to
 
-The planner produces locked batches as JSON. Each brief carries:
+The planner produces locked batches as JSON. Each brief carries these fields
+(the values here are illustrative):
 
 ```json
 {
-  "topic": "The 10-property conventional cap",
+  "topic": "Why a week of posts costs a founder a week",
   "hook_form": "first-person refusal narrative",
-  "hook_source": "LendingTree",
-  "opening_line": "I asked my bank to finance my eleventh rental.",
-  "evidence": "Absent from all 30 DSCR ads in the corpus.",
-  "product": "dscr",
-  "audience": "borrower"
+  "hook_source": "original",
+  "opening_line": "I stopped editing my own videos.",
+  "evidence": "The advertiser and phrasing a search returned, an AIKO page, or an article.",
+  "product": "reframe",
+  "audience": "m-and-a"
 }
 ```
 
-`product` is one of: `dscr`, `fix-and-flip`, `bridge`, `ground-up`, `portfolio`,
-`brrrr`, `multifamily`. `audience` is `broker` or `borrower`. These are the
-natural filters for both new sections.
+`product` is the job the video does: `echo`, `reframe`, `tactic` or `door`.
+`audience` is the founder niche: `m-and-a`, `cre`, `exit-planning`, `tax`,
+`lending`, `franchise`, `builders`, `recruiting` or `any`. These are the natural
+filters for both new sections.
 
 ---
 
@@ -274,7 +287,7 @@ A grid of finished videos. Each item needs:
 - Portrait (9:16) thumbnail with an obvious play affordance
 - The topic it was made from
 - The hook form and where it was borrowed from
-- Product line and audience
+- Post type and niche
 - Date produced
 - Duration
 - Status — draft, approved, published
@@ -282,7 +295,7 @@ A grid of finished videos. Each item needs:
 
 ### 3.3 Interactions
 
-- **Filter** by product line, audience, and status. Reuse the existing pill
+- **Filter** by post type, niche, and status. Reuse the existing pill
   filter-row pattern from the briefing's creative wall — same component,
   same behaviour.
 - **Play inline** rather than navigating away. The briefing's creative wall
@@ -290,7 +303,7 @@ A grid of finished videos. Each item needs:
 - **Detail view** showing the full brief that produced the video — topic, hook,
   opening line, and the evidence that justified it. **This is the important
   one**: it closes the loop from competitor evidence, through hook, to finished
-  asset, and it is the thing that makes the tool defensible to the client.
+  asset, and it is the thing that makes each video defensible to whoever approves it.
 
 ### 3.4 States to design
 
@@ -332,9 +345,9 @@ video and deleting footage both deserve the same treatment.
 
 ## 5. Reference
 
-- Live: `https://jenna-oss.github.io/TrilithMarketingTool/`
-- Repo: `https://github.com/jenna-oss/TrilithMarketingTool`
-- Tokens: the `:root` block at the top of `briefing.html`
+- Live: `https://jenna-oss.github.io/AIKO-ContentStudio/`
+- Repo: `https://github.com/jenna-oss/AIKO-ContentStudio`
+- Tokens: the `:root` block in `assets/app.css`
 - Shared chat component: `assets/chat.css`, `assets/chat.js`
 - Data layer and agent tooling: `RETRIEVAL.md`
 

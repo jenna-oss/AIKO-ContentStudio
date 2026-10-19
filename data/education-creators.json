@@ -1,0 +1,121 @@
+{
+  "fetchedAt": null,
+  "note": "Starting roster, 2026-10-19. Spyglass ids resolve by name on the first run of tools/pull-creators.mjs with an active subscription.",
+  "creators": [
+    {
+      "slug": "justin-welsh",
+      "spyglassId": null,
+      "name": "Justin Welsh",
+      "handle": null,
+      "avatarUrl": null,
+      "platform": "Instagram",
+      "profileUrl": null,
+      "followers": null,
+      "angle": "Solo founder who teaches building a one-person business on LinkedIn and a personal brand.",
+      "productLines": [
+        "personal-brand",
+        "linkedin"
+      ],
+      "audience": "founders",
+      "addedBy": "hand",
+      "addedOn": "2026-10-19",
+      "videos": []
+    },
+    {
+      "slug": "matt-gray",
+      "spyglassId": null,
+      "name": "Matt Gray",
+      "handle": null,
+      "avatarUrl": null,
+      "platform": "Instagram",
+      "profileUrl": null,
+      "followers": null,
+      "angle": "Founder who teaches turning expertise into a content system that brings in clients.",
+      "productLines": [
+        "personal-brand",
+        "short-video"
+      ],
+      "audience": "founders",
+      "addedBy": "hand",
+      "addedOn": "2026-10-19",
+      "videos": []
+    },
+    {
+      "slug": "dan-koe",
+      "spyglassId": null,
+      "name": "Dan Koe",
+      "handle": null,
+      "avatarUrl": null,
+      "platform": "Instagram",
+      "profileUrl": null,
+      "followers": null,
+      "angle": "Writer who teaches one-person businesses to build an audience through ideas and writing.",
+      "productLines": [
+        "personal-brand",
+        "storytelling"
+      ],
+      "audience": "founders",
+      "addedBy": "hand",
+      "addedOn": "2026-10-19",
+      "videos": []
+    },
+    {
+      "slug": "chris-do",
+      "spyglassId": null,
+      "name": "Chris Do",
+      "handle": null,
+      "avatarUrl": null,
+      "platform": "Instagram",
+      "profileUrl": null,
+      "followers": null,
+      "angle": "Designer and agency owner who teaches creatives to price, pitch and win clients through content.",
+      "productLines": [
+        "sales",
+        "short-video"
+      ],
+      "audience": "founders",
+      "addedBy": "hand",
+      "addedOn": "2026-10-19",
+      "videos": []
+    },
+    {
+      "slug": "gary-vaynerchuk",
+      "spyglassId": null,
+      "name": "Gary Vaynerchuk",
+      "handle": null,
+      "avatarUrl": null,
+      "platform": "Instagram",
+      "profileUrl": null,
+      "followers": null,
+      "angle": "Agency founder who argues that daily content is how any business earns attention.",
+      "productLines": [
+        "short-video",
+        "personal-brand"
+      ],
+      "audience": "founders",
+      "addedBy": "hand",
+      "addedOn": "2026-10-19",
+      "videos": []
+    },
+    {
+      "slug": "lara-acosta",
+      "spyglassId": null,
+      "name": "Lara Acosta",
+      "handle": null,
+      "avatarUrl": null,
+      "platform": "Instagram",
+      "profileUrl": null,
+      "followers": null,
+      "angle": "LinkedIn creator who teaches founders to write posts that build authority.",
+      "productLines": [
+        "linkedin",
+        "storytelling"
+      ],
+      "audience": "founders",
+      "addedBy": "hand",
+      "addedOn": "2026-10-19",
+      "videos": []
+    }
+  ],
+  "failures": []
+}

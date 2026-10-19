@@ -40,30 +40,10 @@ function clean(s) {
   return out;
 }
 
-/* Derived, not authoritative — an ad naming two products gets both tags. */
-function productLines(copy, source) {
-  const t = `${copy} ${source || ''}`.toLowerCase();
-  const out = new Set();
-  if (/\bdscr\b/.test(t)) out.add('dscr');
-  if (/fix[\s-]?(and|&|n)?[\s-]?flip|\bflip(ping|s|ped)?\b/.test(t)) out.add('fix-and-flip');
-  if (/\bbridge\b/.test(t)) out.add('bridge');
-  if (/ground[\s-]?up|new construction|construction loan/.test(t)) out.add('ground-up');
-  if (/\bportfolio\b/.test(t)) out.add('portfolio');
-  if (/\bbrrrr\b/.test(t)) out.add('brrrr');
-  if (/multi[\s-]?family|\bmultifamily\b/.test(t)) out.add('multifamily');
-  return [...out];
-}
-
-/* Broker-targeted copy is unmistakable — it talks about the reader's clients,
- * commission, or pipeline. Everything else in a lending corpus is aimed at the
- * borrower, so that is the default rather than 'unknown'. */
-function audience(copy) {
-  const t = (copy || '').toLowerCase();
-  if (/\bbroker|wholesale|your client|your investor client|commission|your pipeline|referral program|loan officer/.test(t)) {
-    return 'broker';
-  }
-  return 'borrower';
-}
+/* The category comes from the sweep that found the ad (tools/pull.mjs). The
+ * lending-era product_lines and audience columns stay on the table, empty. */
+const CATEGORIES = new Set(['ai-video', 'ai-writing', 'scheduling', 'repurposing', 'all-in-one', 'agency']);
+const category = (a) => (CATEGORIES.has(a.category) ? a.category : null);
 
 /* Meta writes dates as prose ('Started running on Aug 1, 2025'). Anything Date
  * cannot parse becomes null rather than a bogus day. */
@@ -91,8 +71,9 @@ const rowsForLoad = ads.map((a) => {
     last_seen: a.lastSeen || a.firstSeen,
     seen_count: a.seenCount || 1,
     source: a.source,
-    product_lines: productLines(copy, a.source),
-    audience: audience(copy),
+    product_lines: [],
+    audience: 'unknown',
+    category: category(a),
   };
 });
 
@@ -103,7 +84,7 @@ await writeFile(join(ROOT, 'data', 'ads-load.json'), JSON.stringify(rowsForLoad)
 const rows = rowsForLoad.map((r) => `(${[
   q(r.library_id), q(r.advertiser_name), q(r.copy), dt(r.started),
   q(r.first_seen), q(r.last_seen), r.seen_count, q(r.source),
-  arr(r.product_lines), q(r.audience),
+  arr(r.product_lines), q(r.audience), q(r.category),
 ].join(',')})`);
 
 await mkdir(join(ROOT, 'data', 'sql'), { recursive: true });
@@ -113,24 +94,21 @@ for (let i = 0; i < rows.length; i += BATCH) batches.push(rows.slice(i, i + BATC
 
 for (const [i, batch] of batches.entries()) {
   const sql = `insert into adspy.ads
-  (library_id, advertiser_name, copy, started, first_seen, last_seen, seen_count, source, product_lines, audience)
+  (library_id, advertiser_name, copy, started, first_seen, last_seen, seen_count, source, product_lines, audience, category)
 values
 ${batch.join(',\n')}
 on conflict (library_id) do update set
   copy          = excluded.copy,
   last_seen     = greatest(adspy.ads.last_seen, excluded.last_seen),
   seen_count    = excluded.seen_count,
-  product_lines = excluded.product_lines,
-  audience      = excluded.audience,
+  category      = coalesce(excluded.category, adspy.ads.category),
   updated_at    = now();`;
   await writeFile(join(ROOT, 'data', 'sql', `ads-${String(i + 1).padStart(2, '0')}.sql`), sql);
 }
 
-const byAudience = rowsForLoad.reduce((m, r) => { m[r.audience] = (m[r.audience] || 0) + 1; return m; }, {});
-const tagged = rowsForLoad.filter((r) => r.product_lines.length).length;
+const byCategory = rowsForLoad.reduce((m, r) => { const k = r.category || '(none)'; m[k] = (m[k] || 0) + 1; return m; }, {});
 const scrubbed = ads.filter((a) => clean(a.copy) !== String(a.copy ?? '')).length;
 
 console.log(`${ads.length} ads → ${batches.length} batches in data/sql/`);
-console.log('audience split:', byAudience);
-console.log(`product lines tagged on ${tagged}/${ads.length}`);
+console.log('by category:', byCategory);
 console.log(`copy scrubbed of stray surrogates on ${scrubbed} ads`);

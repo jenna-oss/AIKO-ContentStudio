@@ -209,8 +209,8 @@
   <h1>Topic-to-Video Pipeline</h1>
   <p class="lede">
     An automated pipeline that takes a <strong>topic</strong> as input and produces a finished,
-    voiced, vertical video — the same process used by hand for the Mayweather, JPMorgan, DSCR, and
-    construction-loan videos, now specified as a repeatable system. Orchestrated with the
+    voiced, vertical video for AIKO Group (@aikogroup.ai), specified as a repeatable system.
+    Orchestrated with the
     <strong>Workflow tool</strong>: judgment-heavy steps run as agent calls, deterministic steps
     (rendering, muxing, file checks) run as plain code between them.
   </p>
@@ -218,17 +218,15 @@
   <h2><span class="num">00</span>Input</h2>
   <p>
     <code>topic</code> (required) — a working title or short description, or a source URL/article
-    when the topic is tied to a specific piece (like a specific blog post). Optional:
-    <code>brandFlag</code> (whether to include client branding in the closer), target duration
-    range.
+    when the topic is tied to a specific piece (like a specific blog post). Optional: target
+    duration range.
   </p>
 
   <h2><span class="num">01</span>Research &amp; Facts</h2>
   <div class="stage-meta"><span class="pill agent">agent · web search/fetch</span></div>
   <p>
     Web-searches the topic, cross-checks 2–3 sources, extracts dated facts with citations. Flags
-    when hard numbers are missing (as the construction-loan article did) rather than inventing
-    them. Output shape matches the existing <span class="path">data/topics_*.json</span> format.
+    when hard numbers are missing rather than inventing them. Output shape matches the existing <span class="path">data/topics_*.json</span> format.
   </p>
 
   <h2><span class="num">02</span>Hook + Script</h2>
@@ -244,22 +242,23 @@
     (<span class="path">hook_templates_1000.json</span> — Educational, Storytelling, Authority,
     Myth Busting, Comparison, Day in the Life, Random), then fills its <code>(insert X)</code>
     placeholders with real facts from Stage 01. Example: "This represents your X before, during,
-    and after X" → "This represents your credit score before, during, and after a DSCR loan."
+    and after X" → "This represents your week before, during, and after a content system."
   </p>
   <p>
     <strong>Written for complete beginners.</strong> Research also returns the topic's key terms with
     plain-English meanings. The script explains each term the first time it's used, keeps to one idea
     per beat, and builds to a single takeaway. A separate agent then hears only the narration, as
-    someone new to real estate investing would, and flags any unexplained term or confusing beat. The
+    an expert founder who has never done marketing would, and flags any unexplained term or
+    confusing beat. The
     script gets one revision against what it flags, then a second listen.
   </p>
   <p>
-    <strong>In The Buy Box's voice.</strong> The script stage carries the brand guide's personality,
-    voice and tone, with the guide's own "Say this / Not this" examples. The speaker is the person on the
-    other side of the underwriting desk: experienced, beginner friendly and confident about the math, never
-    superior, dumbed down or certain about the future. Scripts never mention Trilith or pitch a product,
-    and the last beat asks the viewer to follow The Buy Box. A lint flags hype, talking down, promises
-    about the future and a missing follow ask. Its notes go into the same single revision as the
+    <strong>In AIKO's voice.</strong> The script stage carries the AIKO brand system's voice and tone,
+    with its own "Say / Never say" lists. The speaker is a faceless narrator, never on camera: precise,
+    calm and on the founder's side, speaking to the founder as "you" and saying "AIKO", never "I" or
+    "we". Scripts never name a competing tool, app or agency, and the last beat asks the viewer to
+    follow AIKO. A lint flags hype, talking down, promises about results, counting followers or views,
+    and a missing follow ask. Its notes go into the same single revision as the
     beginner check.
   </p>
   <p>Writes the full 10–12 beat script (line + estSeconds per beat), same shape as <span class="path">data/script_*.json</span>.</p>
@@ -269,18 +268,22 @@
   <p>
     Gives each beat <strong>its own visual idea</strong>: what is on screen and how it moves,
     written for that line. There is no component library to pick from; scenes are designed from
-    scratch so the videos keep their variety. Each beat also gets a background (black, white,
-    concrete, or footage) and an accent: orange for the one thing to look at, green only for the
-    answer, or none. Beats needing a real video clip are flagged for Stage 04.
+    scratch so the videos keep their variety. Each beat also gets a background (Electric, Tangerine,
+    Paper, Ink, Deep, the hard horizon, or footage) and an accent: the turn of the line set in
+    Instrument Serif italic, or none. Beats needing a real video clip are flagged for Stage 04.
+    There is no photo library: a video opens on a hard horizon (an Electric #3150FD field meeting a
+    Tangerine #FC3D05 field, the line landing half on each) or a cropped word.
   </p>
   <div class="callout">
-    <span class="label">The Buy Box rules: enforced, not suggested</span>
+    <span class="label">AIKO rules: enforced, not suggested</span>
     Checked in code, and the plan is sent back with the reasons if it fails any of these:
     <ul>
       <li>No two beats in a row share a background.</li>
       <li>Footage exactly where a beat needs an asset.</li>
-      <li>The closing frame sits on black or white.</li>
-      <li>At least one scene uses Site Orange.</li>
+      <li>Beat 1 opens on a brand device: the hard horizon, or a cropped word on Electric or Tangerine.</li>
+      <li>Electric on at least a quarter of the beats; Tangerine at most twice in nine.</li>
+      <li>The closing frame sits on Electric or Tangerine.</li>
+      <li>At least one beat sets its turn in italic, and none has more than one italic phrase.</li>
     </ul>
     Text size is a floor, not a tier: headlines at least 110px, nothing under 40px.
   </div>
@@ -326,7 +329,7 @@
   <div class="callout">
     <span class="label">Crop failure ≠ rejection</span>
     A clip that's relevant and interesting but doesn't survive a 9:16 <em>cover</em> crop isn't
-    thrown away — Assembly renders it <strong>contained on black or white</strong> instead (the clip
+    thrown away — Assembly renders it <strong>contained on Ink or Paper</strong> instead (the clip
     shown in full at its native aspect ratio, on a brand surface) rather than force-cropping it and
     losing the subject, or discarding a genuinely good asset over an aspect-ratio mismatch.
   </div>
@@ -336,8 +339,7 @@
     On a <code>relevant</code> or <code>visuallyInteresting</code> reject, try the next candidate —
     up to <strong>4 attempts per beat</strong>. If nothing passes, that beat falls back to a
     graphic-only scene (no photo/video). No silent settling for a clip that merely "sort of" fits —
-    this was the exact failure mode that produced the disliked brick-wall photo before a human had
-    to catch it by eye.
+    a clip that only loosely fits is worse than a designed scene.
   </div>
 
   <h2><span class="num">06</span>Assembly</h2>
@@ -348,19 +350,20 @@
     the brand, not layouts:
   </p>
   <ul>
-    <li><span class="path">src/brand.ts</span>: the colors, Archivo and Inter, the logo, the Reels
-      safe zone and the text-size floors.</li>
+    <li><span class="path">src/brand.ts</span>: the AIKO colors (Electric #3150FD, Tangerine
+      #FC3D05 and their grounds), Instrument Serif, Public Sans and IBM Plex Mono, the AIKO Group
+      wordmark, the Reels safe zone and the text-size floors.</li>
     <li>The word-synced <span class="path">src/Captions.tsx</span> overlay.</li>
-    <li>A closing frame designed fresh each time, but always with the logo, the takeaway and
-      "Follow @thebuyboxre".</li>
+    <li>A closing frame designed fresh each time, but always with the AIKO Group wordmark, the
+      takeaway and "Follow @aikogroup.ai".</li>
   </ul>
   <p>
     Before rendering, the agent must pass <span class="path">brand-lint.mjs</span>. It rejects:
   </p>
   <ul>
     <li>off-palette colors, gradients, shadows and rounded corners</li>
-    <li>fonts other than Archivo and Inter, and text under 40px</li>
-    <li>a missing caption overlay, logo or follow ask</li>
+    <li>fonts other than Instrument Serif, Public Sans and IBM Plex Mono, and text under 40px</li>
+    <li>a missing caption overlay, wordmark or follow ask</li>
     <li>scene text that would collide with something: on top of the captions, below the safe zone
       under Instagram's controls, or more than 40px past its other edges. This is read from the
       component's real structure, so an offset inside a card or <code>&lt;SafeArea&gt;</code> is judged
@@ -384,7 +387,7 @@
   <h2><span class="num">07</span>Voiceover</h2>
   <div class="stage-meta"><span class="pill agent">agent, runs the ElevenLabs step</span></div>
   <p>
-    The timestamp-driven approach proven across the last three videos: one continuous ElevenLabs
+    The timestamp-driven approach: one continuous ElevenLabs
     take with word-level alignment, real per-scene durations computed from the actual audio, then
     written back into the <code>.tsx</code> scene durations and <span class="path">Root.tsx</span>'s
     total duration — the video is timed to the voice, never the other way around.

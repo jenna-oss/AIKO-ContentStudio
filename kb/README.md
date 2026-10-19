@@ -117,7 +117,7 @@ retrievable in seconds, without waiting for the scheduled run.
 
 Text only — `.txt` `.md` `.vtt` `.srt` `.json` `.csv` `.tsv`. PDFs and Word
 documents go in `kb/files/` above, because the parsers for those cannot run in a
-Worker. Needs `KB_UPLOAD_TOKEN` set on the Worker; the page asks for it once.
+Worker. Behind the app's sign-in like every other route; nothing else to set.
 
 ## Then
 

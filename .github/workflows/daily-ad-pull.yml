@@ -1,7 +1,7 @@
 name: Daily ad pull
 
 # Sweeps the Meta Ad Library, folds the results into data/ads.json, rewrites the
-# automated regions of briefing.html and pushes. GitHub Pages rebuilds on push.
+# ad corpus the Competitors page reads, and pushes. GitHub Pages rebuilds on push.
 #
 # Known risk, accepted deliberately: Meta frequently challenges datacenter IPs,
 # and a headless runner cannot clear a challenge. tools/pull.mjs therefore exits
@@ -46,23 +46,10 @@ jobs:
       - name: Merge into the corpus
         run: node tools/merge.mjs
 
-      # The wall tops brands up from this sweep when Spyglass has no paid
-      # creative for them, and those records carry no image, so the cards were
-      # rendering as a bare date plate. Fetches artwork for the handful that
-      # need it, straight from the Ad Library, and caches it — a normal day
-      # fetches nothing. Never fatal: without it the cards look how they always
-      # did, and the harvest is worth more than the pictures.
-      - name: Fetch Ad Library artwork
-        continue-on-error: true
-        run: node tools/adlib-thumbs.mjs
-
-      - name: Render the live feed
-        run: node tools/render.mjs
-
       - name: Shape the load payload
         run: node tools/to-sql.mjs
 
-      # Trilith's own writing changes far more slowly than the ad market, but
+      # AIKO's own writing changes far more slowly than the ad market, but
       # re-harvesting is cheap and catches edits and new posts without anyone
       # remembering to run it. Failures here must not sink the ad pull, which
       # is the part that cannot be re-run later.
@@ -80,7 +67,7 @@ jobs:
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data briefing.html assets/thumbs
+          git add data
           if git diff --staged --quiet; then
             echo "Nothing changed today."
             exit 0
@@ -127,5 +114,4 @@ jobs:
         run: |
           echo "::warning::Harvest failed the health gate. Nothing was committed."
           echo "Most likely Meta challenged this runner's IP. If this repeats for"
-          echo "several days, move the job onto a machine with a residential IP"
-          echo "and run tools/recency-pull.js by hand in the meantime."
+          echo "several days, move the job onto a machine with a residential IP."

@@ -6,14 +6,14 @@ a prompt.
 
 | Schema    | What it holds                                    | Entry point                  |
 | --------- | ------------------------------------------------ | ---------------------------- |
-| `adspy`   | 781 competitor ads, 256 advertisers               | `adspy.search_ads`           |
-| `content` | 37 Trilith pages, 254 passages                    | `content.search_content`     |
-| `adspy`   | hook and ad-angle patterns from 7 outside advertisers | `adspy.search_hook_patterns` |
+| `adspy`   | competitor ads: AI content tools, video and scheduling apps, agencies | `adspy.search_ads` |
+| `content` | AIKO's own content, split into passages           | `content.search_content`     |
+| `adspy`   | hook and ad-angle patterns from founder and creative creators | `adspy.search_hook_patterns` |
 
 The first two answer *what to say*: what competitors are saying, and what
-Trilith has already said. The third answers *what shape to say it in*, and is
-the only one not sourced from the lending category — read its caveats before
-using it.
+AIKO has already said. The third answers *what shape to say it in*, and is
+the only one not sourced from the AI content tool category — read its caveats
+before using it.
 
 A fourth schema, `kb`, holds the content intelligence knowledge base —
 transcripts, research, the published record as topic and angle, idea memory and
@@ -29,12 +29,11 @@ corpora described here.
 
 ```sql
 select * from adspy.search_ads(
-  q             => 'no income verification',  -- relevance search over ad copy
-  advertiser    => 'kiavi',                   -- fuzzy, partial names are fine
-  product       => 'dscr',                    -- dscr | fix-and-flip | bridge |
-                                              -- ground-up | portfolio | brrrr |
-                                              -- multifamily
-  audience      => 'broker',                  -- broker | borrower
+  q             => 'faceless videos',         -- relevance search over ad copy
+  advertiser    => 'opus',                    -- fuzzy, partial names are fine
+  category      => 'ai-video',                -- ai-video | ai-writing |
+                                              -- scheduling | repurposing |
+                                              -- all-in-one | agency
   seen_since    => '2026-08-01',              -- when *we* first saw it
   started_since => '2026-08-01',              -- when Meta says it launched
   max_rows      => 40                         -- capped at 500
@@ -59,32 +58,33 @@ select * from adspy.advertiser_summary order by ad_count desc;
 select name, fb_page_id from adspy.advertisers where is_tracked;
 ```
 
-18 lenders are under deliberate daily watch. Seven of them have zero ads, and
-that is data, not a gap — CoreVest and Anchor Loans run nothing on Meta despite
-their size. The remaining 231 advertisers surfaced through keyword sweeps.
+Tracked advertisers are under deliberate daily watch by page id; the rest
+surface through keyword sweeps. A tracked advertiser with zero ads is data, not
+a gap. `category` says what an ad sells and is null until the ad is classified.
 
 ## Two things the data will not tell you
 
 **`started` is not `first_seen`.** `started` is Meta's launch date; `first_seen`
 is the day our sweep first observed the ad. Only `first_seen` supports a claim
-like "new this week", and even then the baseline sweep of 2026-08-15 has to be
-excluded, because everything running that day shares that date without being new.
+like "new this week", and even then the first sweep has to be excluded, because
+everything running that day shares that date without being new.
 
-**Ad count is not spend.** A lender running 114 creatives is not outspending one
-running 33. The Ad Library reports creatives, never budget.
+**Ad count is not spend.** An advertiser running a hundred creatives is not
+necessarily outspending one running thirty. The Ad Library reports creatives,
+never budget.
 
 ---
 
 # Hook patterns — `adspy.hook_patterns`
 
-Searchable creative structures from seven advertisers outside the lending
-category, via the Spyglass API. `HOOK` is how a piece opens; `AD_ANGLE` is the
+Searchable creative structures from founder, business and marketing creators
+outside the AI-tool category, via the Spyglass API. `HOOK` is how a piece opens; `AD_ANGLE` is the
 claim it leads with. Rows from before October 2026 call that `USP`: Spyglass
 dropped that type in September 2026, and those rows are kept but no longer refresh.
 
 Two volume-ish fields, and they are not the same thing:
 
-- **`total`** — times the pattern was used. Only on the 59 rows seeded from the
+- **`total`** — times the pattern was used. Only on rows seeded from the
   Spyglass MCP surface; the REST endpoint does not report it, so it is null
   elsewhere. Null means *unknown*, never zero, and `min_total` skips those rows
   rather than dropping them.
@@ -92,32 +92,34 @@ Two volume-ish fields, and they are not the same thing:
   hook running every week for two months is a different signal from one that
   spiked once.
 
-| Brand | Category | Searchable | Why it is here |
-| --- | --- | ---: | --- |
-| Alex Hormozi | Business education | 87 | Operator and broker voice, offer framing |
-| NerdWallet | Consumer finance | 67 | Money anxiety, comparison, regret framing |
-| Zillow | Real estate | 52 | Property decisions, agent authority |
-| Chime | Consumer finance | 48 | Fast-benefit and challenge openers |
-| LendingTree | Consumer finance | 27 | Rate comparison and refinance structure |
-| Robert Kiyosaki | Finance education | 22 | Contrarian macro and asset framing |
-| Rocket Money | Consumer finance | 14 | Hidden-cost and confession openers |
+The pinned list is in `tools/pull-spyglass.mjs`:
+
+| Brand | Category |
+| --- | --- |
+| Justin Welsh | Founder brand |
+| Matt Gray | Founder brand |
+| Dan Koe | Founder brand |
+| Chris Do | Creative and agency |
+| Gary Vaynerchuk | Creative and agency |
+
+Their Spyglass ids are not resolved yet — the subscription was inactive when the
+list was chosen — and a brand without an id is skipped, so the table fills only
+once ids are pinned and `SPYGLASS_API_KEY` is set on an active subscription.
 
 ```sql
 select * from adspy.search_hook_patterns(
-  q            => 'rate comparison refinance savings',
+  q            => 'contrarian opener about time',
   insight_type => 'HOOK',        -- HOOK | AD_ANGLE | USP (older rows)
-  brand        => 'lendingtree',
+  brand        => 'justin welsh',
   min_total    => 10,            -- only patterns used at least this often
   max_rows     => 25
 );
 ```
 
-**These brands are not Trilith competitors, and this is not competitor
-intelligence.** Spyglass has no insight coverage for investor lenders at all —
-Kiavi, Lima One and the rest return empty, the same ceiling the Meta sweep hit.
-What it offers is *form*: the shape a piece of creative takes, abstracted into
-something reusable. Substance has to come from the ad corpus or Trilith's own
-writing. The agent is instructed never to claim a competitor uses a hook on the
+**These creators are not AIKO competitors, and this is not competitor
+intelligence.** What it offers is *form*: the shape a piece of creative takes,
+abstracted into something reusable. Substance has to come from the ad corpus,
+AIKO's own content or the knowledge base. The agent is instructed never to claim a competitor uses a hook on the
 strength of this table, and to say plainly when it is adapting a form from
 outside the category.
 
@@ -126,7 +128,9 @@ Negative means the brand is leaning on that pattern less than it was.
 
 ## Refreshing it
 
-`.github/workflows/weekly-hook-patterns.yml`, Mondays 12:00 UTC.
+`.github/workflows/weekly-hook-patterns.yml`, Mondays 12:00 UTC once its
+`schedule:` block is uncommented (it is off until the repository secrets are
+added).
 `tools/pull-spyglass.mjs` calls `GET /brands/{id}/insights` on
 `https://app.spyglass.so/api/v1` for a pinned brand list;
 `tools/push-hook-patterns.mjs` sends the result through `hook_patterns_upsert`.
@@ -138,7 +142,7 @@ Three deliberate choices, all driven by Spyglass billing **credits per row
 returned**:
 
 - **Weekly, not daily.** Creative structure moves far more slowly than ad
-  inventory. Seven brands x two insight types is fourteen calls a week.
+  inventory. Five brands x two insight types is ten calls a week.
 - **Not a live agent tool.** Wiring Spyglass into the agent directly would spend
   credits on every question anyone asks, with no ceiling. The agent reads the
   Postgres copy instead.
@@ -158,41 +162,30 @@ re-delete those rows every week, set `muted = true`:
 
 ```sql
 update adspy.hook_patterns set muted = true
-where brand_id = '7129388593' and label ilike '%astrology%';
+where brand_id = '<spyglass id>' and label ilike '%giveaway%';
 ```
 
 Muted rows are excluded from search and the refresh never clears the flag, so
 the judgement survives and stays visible instead of being reapplied by hand.
-
-91 of the 408 rows are muted and excluded from search:
-
-- **80 superseded paraphrases.** The first load was by hand and some labels were
-  shortened in the process, so the API's verbatim versions arrived as new rows
-  beside them. The paraphrase is muted, not deleted, because it carries a
-  `total` the API cannot supply.
-- **11 creator-content artifacts** — astrology aesthetics, a Santa persona, song
-  lyrics, a Game Boy reaction, AI-clone hooks specific to Hormozi's own product.
-  These were filtered by hand on the first load and the refresh pulled them back
-  in, which is exactly why muting exists.
-
-Brands considered and skipped: Airbnb (traveller-facing, not host-facing),
-Robinhood and Acorns (retail-trading psychology, further from the audience than
-what is already loaded). Kiavi, Lima One and every other investor lender return
-empty and cannot be added.
+Mute rather than delete a paraphrase that carries a `total`, because the API
+cannot supply one again.
 
 ---
 
-# Trilith's own content — `content`
+# AIKO's own content — `content`
 
-37 pages: 22 blog posts, 4 funded-deal writeups, 6 product pages, the FAQ and
-the rest. Split into 254 passages, because the unit of retrieval is the passage,
-not the article — a post runs a thousand words and an agent wants the paragraph
-that answers its question.
+AIKO has no site yet, so this corpus is read from Markdown files in
+`content/own/` — the positioning and the product copy — which are gitignored
+because this repository is public. Once there is a site, set `OWN_SITE_SITEMAP`
+to its sitemap URL and its pages are harvested alongside the files. Everything
+is split into passages, because the unit of retrieval is the passage, not the
+article — a post runs a thousand words and an agent wants the paragraph that
+answers its question.
 
 ```sql
 select * from content.search_content(
-  q        => 'appraisal comes in low',   -- passage-level relevance search
-  kind     => 'blog',                     -- blog | case-study | product | faq | page
+  q        => 'approve before posting',   -- passage-level relevance search
+  kind     => 'blog',                     -- positioning | page | faq | blog
   since    => '2026-06-01',               -- published on or after
   until    => '2026-08-01',
   max_rows => 20                          -- capped at 200
@@ -204,7 +197,7 @@ in `**`, so an agent can judge relevance before reading the whole thing, and the
 `url` and `title` to cite. When a passage is not enough:
 
 ```sql
-select * from content.get_document('/blog/fix-and-flip-math');   -- full body
+select * from content.get_document('<url>');                     -- full body
 select * from content.document_index order by published desc;    -- coverage map
 ```
 
@@ -218,17 +211,18 @@ passages carrying every term, and a bonus for a hit in the heading — headings 
 where these posts state their arguments.
 
 The weak spot is worth knowing: the corpus is small and topically narrow, so IDF
-misjudges domain vocabulary. "Appraisal" appears in 34 of 254 passages and
-"low" in 12, which makes the retriever treat *low* as the rarer, more meaningful
-word. Proximity is what rescues the ranking there. Expect the same effect for any
-term central to lending — DSCR, bridge, rehab — and lean on `kind` and date
-filters when a query is built entirely from house vocabulary.
+misjudges domain vocabulary. A word central to the product — *video*, say —
+appears in so many passages that the retriever treats an ordinary word beside it
+as the rarer, more meaningful one. Proximity is what rescues the ranking there.
+Lean on `kind` and date filters when a query is built entirely from house
+vocabulary.
 
 ## Two things the content data will not tell you
 
 **Only blog posts have publisher-stated dates.** `date_source` says where a date
-came from: `json-ld` means Trilith stated it, `sitemap-lastmod` means it was
-inferred from a file timestamp. Product pages have no date at all — every static
+came from: `json-ld` means the publisher stated it, `sitemap-lastmod` means it was
+inferred from a file timestamp, and `front-matter` means a file in
+`content/own/` set `published` itself. A file without it has no date. Product pages have no date at all — every static
 page shares one sitemap timestamp, which is the site build stamp, and the
 harvester discards it rather than presenting a build as a publication.
 
@@ -241,18 +235,21 @@ harvester discards it rather than presenting a build as a publication.
 Both corpora refresh from the same daily job.
 
 **Ads.** `tools/to-sql.mjs` shapes `data/ads.json` into `data/ads-load.json`,
-deriving `product_lines` and `audience` from the copy — those rules live there
-and nowhere else. `tools/push-supabase.mjs` sends it through the
+deriving `product_lines` and `audience` from the copy. Those two columns are
+kept so the older loaders still insert cleanly, but the search and count
+functions no longer filter on them: they filter on `category`, what the ad
+sells. `tools/push-supabase.mjs` sends it through the
 `adspy_upsert_ads` RPC, which owns the merge: `first_seen` is never overwritten
 and `last_seen` only moves forward.
 
-**Content.** `tools/pull-content.mjs` walks the sitemap and re-chunks every
-page into `data/content.json`. `tools/push-content.mjs` sends it through
+**Content.** `tools/pull-content.mjs` reads `content/own/` (and walks the
+sitemap when `OWN_SITE_SITEMAP` is set) and re-chunks every document into
+`data/content.json`. `tools/push-content.mjs` sends it through
 `content_upsert_docs`, which upserts each document by URL and replaces its
 chunks wholesale — chunk boundaries move whenever a post is edited or the
 chunker changes, so ordinals cannot be merged in place.
 
-The content steps are marked `continue-on-error`: Trilith's writing changes
+The content steps are marked `continue-on-error`: AIKO's writing changes
 slowly and can be re-harvested tomorrow, but a missed ad sweep is gone for good,
 so a site hiccup must not take the ad pull down with it.
 
@@ -270,9 +267,9 @@ model five tools rather than a corpus:
 | ------------------------ | ---------------------------- |
 | `search_competitor_ads`  | `public.adspy_search_ads`    |
 | `count_ads`              | `public.adspy_count_ads`     |
-| `search_trilith_content` | `public.content_search`      |
+| `search_aiko_content`    | `public.content_search`      |
 | `search_hook_patterns`   | `public.hook_patterns_search` |
-| `trilith_coverage`       | `public.content_coverage`    |
+| `aiko_coverage`          | `public.content_coverage`    |
 
 Seven more come from the knowledge base — `search_transcripts`,
 `search_research`, `search_previous_content`, `check_repetition`,
@@ -335,8 +332,8 @@ function callable by anon would let anyone rewrite either corpus.
 
 ## On embeddings
 
-There is still no vector column on **either of these two corpora**. At 913 ads
-and 561 passages, full-text with IDF and proximity ranking answers the questions
+There is still no vector column on **either of these two corpora**. At their
+size, full-text with IDF and proximity ranking answers the questions
 being asked, and both schemas leave room to add one later.
 
 The reasoning has partly moved on, though. The objection was a third-party

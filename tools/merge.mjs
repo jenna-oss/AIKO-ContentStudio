@@ -12,6 +12,7 @@ import { readFile, writeFile, mkdir, readdir } from 'node:fs/promises';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { isRelevant } from './ad-relevance.mjs';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 const CORPUS = join(ROOT, 'data', 'ads.json');
@@ -28,12 +29,15 @@ const corpus = existsSync(CORPUS)
 
 const day = latest.runAt.slice(0, 10);
 /* seenCount and runs count days, not sightings. The same ad can turn up twice
- * in one pull (a keyword sweep and its lender's page), and a re-run rewrites
+ * in one pull (two keyword sweeps), and a re-run rewrites
  * the same day's raw file; neither is a second day of it running. */
 const rerun = Boolean(corpus.updatedAt) && corpus.updatedAt.slice(0, 10) === day;
 let added = 0;
+let dropped = 0;
 
 for (const ad of latest.ads) {
+  /* Off-topic ads the keyword search pulled in never enter the corpus. */
+  if (!isRelevant(ad)) { dropped++; continue; }
   const key = ad.libraryId;
   const prev = corpus.ads[key];
   if (prev) {
@@ -41,6 +45,8 @@ for (const ad of latest.ads) {
     prev.lastSeen = day;
     // copy can be edited in place by the advertiser; keep the newest
     if (ad.copy && ad.copy !== prev.copy) prev.copy = ad.copy;
+    // The first sweep to find an ad names its category; later ones fill a gap.
+    if (!prev.category && ad.category) prev.category = ad.category;
   } else {
     corpus.ads[key] = {
       libraryId: key,
@@ -48,6 +54,7 @@ for (const ad of latest.ads) {
       started: ad.started,
       copy: ad.copy,
       source: ad.source,
+      category: ad.category ?? null,
       firstSeen: day,
       lastSeen: day,
       seenCount: 1
@@ -62,7 +69,7 @@ corpus.baselineRun = corpus.runs === 1;
 
 /* Everything captured on the first sweep shares a firstSeen of that day, so a
  * naive "new in the last 7 days" count would report the entire back catalogue
- * as new for a week. Remember the baseline date so render.mjs can exclude it
+ * as new for a week. Remember the baseline date so competitors.html can exclude it
  * and only ever claim genuinely newly-observed creative. */
 if (corpus.runs === 1) corpus.baselineDay = day;
 
@@ -71,7 +78,7 @@ await writeFile(CORPUS, JSON.stringify(corpus, null, 2));
 
 const total = Object.keys(corpus.ads).length;
 console.log(
-  `run ${corpus.runs} · ${added} new · ${total} total ads · ` +
+  `run ${corpus.runs} · ${added} new · ${dropped} off-topic dropped · ${total} total ads · ` +
   `${new Set(Object.values(corpus.ads).map((a) => a.advertiser)).size} advertisers` +
   (corpus.baselineRun ? '\nThis is the baseline run — everything counts as new by definition.' : '')
 );

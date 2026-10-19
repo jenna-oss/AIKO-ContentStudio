@@ -9,12 +9,12 @@ keyword together, reranked, diversity-filtered, and cut to a token budget.
 
 | | `adspy` | `content` | `kb` |
 | --- | --- | --- | --- |
-| Holds | competitor ads | Trilith's website | transcripts, research, published record, ideas, hooks |
+| Holds | competitor ads | AIKO's own content | transcripts, research, published record, ideas, hooks |
 | Retrieval | keyword | keyword | **hybrid + rerank** |
-| Written by | daily ad pull | daily content crawl | `npm run kb` |
+| Written by | daily ad pull | daily content harvest | `npm run kb` |
 
 `adspy` and `content` are untouched by any of this. Nothing here alters a table
-the 06:00 harvest writes to.
+the daily ad harvest writes to.
 
 ---
 
@@ -26,7 +26,8 @@ design, not an implementation detail.
 **Stable structured context** — brand, audience, positioning, goals, beliefs,
 pillars. Relational, small, handed to the planner whole. Never retrieved
 against, never embedded. `kb.brands`, `kb.content_strategies`,
-`kb.content_pillars`. **All three are empty**, and that has consequences — see
+`kb.content_pillars`. **`kb.brands` holds only the `aiko` row and the other two
+are empty**, and that has consequences — see
 [Strategic relevance is off](#strategic-relevance-is-off).
 
 **Large unstructured knowledge** — transcripts, research, articles, reports.
@@ -107,7 +108,7 @@ curve:
 | 90 days | 0.65 | 0.85 |
 | 1 year | 0.30 | 0.61 |
 
-**An undated document scores 0.50.** Not zero, which would bury 22 real pages
+**An undated document scores 0.50.** Not zero, which would bury real pages
 for a reason that is about our metadata rather than their merit; not one, which
 would let them beat everything written this week.
 
@@ -120,7 +121,7 @@ sources and `SUPPORT` is allowed to go deep on one.
 
 ### Keyword matching is OR, not AND
 
-`websearch_to_tsquery` ANDs every term, so *"DSCR loans for new investors"*
+`websearch_to_tsquery` ANDs every term, so *"faceless video for new advisors"*
 demands the word "new" and returns nothing. Matching is therefore OR across
 terms with a 1.6× multiplier for rows carrying every term — the same rule
 `adspy.search_ads` and `content.search_content` already use, so all four corpora
@@ -137,7 +138,7 @@ away in `kb.retrieval_settings` or `kb.ranking_weights`.
 
 Weight `0.00`. The spec scores a candidate against the brand's current strategy
 (§23), and `kb.content_strategies` and `kb.content_pillars` are empty — there is
-nothing in the database describing what Trilith is trying to be known for.
+nothing in the database describing what AIKO is trying to be known for.
 
 **This is the biggest gap in the system**, because it is a quarter of the
 intended ranking formula. Until it is filled, retrieval answers "what is
@@ -163,7 +164,7 @@ rank everything identically while looking like it was doing something.
 ## The pipeline
 
 ```
-kb/files/  kb/sources.json
+kb/files/  kb/sources.json  kb/feeds.json
        │
        ▼
   kb-ingest      parse, hash, upsert       ← fast, safe to repeat
@@ -191,8 +192,15 @@ npm run kb:seed-hooks   # build the hook library from adspy.hook_patterns
 ```
 
 Scheduled daily at 14:00 UTC by `.github/workflows/knowledge-base.yml`, an hour
-after the creator pull and two after the ad pull. It writes nothing to git —
-everything lands in Postgres — so there is no push to race over.
+after the creator pull and three after the ad pull. The `schedule:` block is
+commented out until the repository secrets are added, so for now it runs only
+when triggered by hand. It writes nothing to git — everything lands in Postgres —
+so there is no push to race over.
+
+`kb/feeds.json` lists the sources read on every run, newest posts first and
+bounded per feed: Seth's Blog, SaaStr, Sahil Bloom, Lenny's Newsletter, ACG
+Insights, IBBA, Peak Business Valuation, Commercial Observer, Connect CRE, Bisnow,
+The Verge (AI), MIT Technology Review (AI), OpenAI News and Google AI.
 
 Getting material in is documented in [`kb/README.md`](kb/README.md).
 
@@ -212,12 +220,12 @@ would still look sound.
 
 **A shared token is required.** `/kb/upload` is the only route that writes, and
 the CORS allowlist is a browser control, not a security boundary — `curl` sends
-whatever `Origin` it likes. Without a token, anyone who found the Worker URL
+whatever `Origin` it likes. Without a lock, anyone who found the Worker URL
 could put text into the corpus the planner is instructed to trust, which would
-defeat every traceability guarantee here. Set it with
-`npx wrangler secret put KB_UPLOAD_TOKEN`; the page asks for it once and keeps it
-in `localStorage`. With no token set, the route returns 503 rather than running
-unguarded.
+defeat every traceability guarantee here. The lock is the app's sign-in: the
+route, like every other, answers only a Clerk session whose email is in
+`kb.app_users`. (It once had a shared upload token of its own; sign-in replaced
+it.)
 
 Uploads are contained in the database as well as at the door. Every uploaded
 document is forced into an `upload:` source-key namespace, and
@@ -364,25 +372,18 @@ run and skip work already done.
 
 ## What this will not tell you
 
-**The website corpus counts every page twice.** `content.documents` holds 80
-rows for 41 real pages — each one crawled as both `trilithfunding.com` and
-`www.trilithfunding.com`. The mirror into `published_content` canonicalises on
-the `www` form, so repetition detection sees each piece once. `search_trilith_content`
-does not: it still returns both copies of a passage, which inflates any count
-taken from it and wastes half of every result set. Fixing that means
-de-duplicating the content harvest, which is outside this schema.
-
 **An empty result is not an empty world.** It means nothing in *our* corpus
-matched. The corpus is whatever has been dropped in `kb/files/` and listed in
-`kb/sources.json` — nothing arrives on its own.
+matched. The corpus is whatever has been dropped in `kb/files/`, listed in
+`kb/sources.json`, or published by a feed in `kb/feeds.json` — nothing else
+arrives on its own.
 
 **A derived topic or angle is not the author's.** Every row the mirror writes is
-marked `derivation: model-inferred` in metadata. Nobody at Trilith wrote "angle:
-lower rates don't mean cheaper homes" on that post; a model read the post and
-said so.
+marked `derivation: model-inferred` in metadata. Nobody at AIKO wrote an angle
+on the post; a model read the post and said what it took the angle to be.
 
 **A hook from the pattern library is not a competitor's hook.** Those forms come
-from seven advertisers outside lending. Every row carries `origin:
+from founder, business and marketing creators outside the AI-tool category.
+Every row carries `origin:
 hook_patterns` and `out_of_category: true`, and the planner is instructed to
 describe them as adapted forms.
 

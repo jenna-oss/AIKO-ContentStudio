@@ -16,46 +16,26 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
 
-/* Category sweeps plus the lenders we already resolved to numeric page ids.
- * Page-id queries are exact; keyword queries are fuzzy but catch new entrants. */
+/* What AIKO's buyers are being sold: keyword sweeps by category. Each ad is
+ * tagged with the category of the sweep that found it, which is what the
+ * Competitors page and the planner's category filter read. Keyword queries are
+ * fuzzy and Meta caps their depth for datacenter IPs (a runner sees roughly a
+ * quarter of what a residential connection does), so two phrasings per
+ * category. Page-id targets for the advertisers that turn out to matter can be
+ * added once a few sweeps show who they are: { label, category, url: page(id) }. */
 const TARGETS = [
-  /* Discovery. Catches new entrants, but note that Meta caps keyword depth for
-   * datacenter IPs — a runner sees roughly a quarter of what a residential
-   * connection does. Page-id targets below are unaffected. */
-  { label: 'kw:fix-and-flip', url: kw('fix and flip loan') },
-  { label: 'kw:dscr',         url: kw('DSCR loan investor') },
-  { label: 'kw:bridge',       url: kw('bridge loan real estate investor') },
-  { label: 'kw:ground-up',    url: kw('new construction loan investor') },
-
-  /* Largest by origination volume — the national platforms Trilith is measured
-   * against. Kiavi ~$8B/yr and #1 in the US; CoreVest $7.8B lifetime;
-   * Lima One $2B+; RCN and Anchor are top-10 RTL originators. */
-  { label: 'page:kiavi',      url: page('199787047046840') },
-  { label: 'page:limaone',    url: page('248880558512632') },
-  { label: 'page:rcn',        url: page('265616356813717') },
-  { label: 'page:anchor',     url: page('180735095285808') },
-  { label: 'page:corevest',   url: page('550429851723713') },
-  { label: 'page:visio',      url: page('1451703848411077') },
-  { label: 'page:newsilver',  url: page('355605498348601') },
-  { label: 'page:roc360',     url: page('122866955776216') },
-
-  /* Heaviest advertisers found in the baseline sweep, by live ad count.
-   * These are the ones actually spending, regardless of balance-sheet size. */
-  { label: 'page:capitalfund1', url: page('137947142913181') },  // 15 live ads
-  { label: 'page:lendingone',   url: page('1488778371407976') }, // 10
-  { label: 'page:griffin',      url: page('487741591332537') },  //  6
-  /* Resolved from a live ad's library id, not from the vanity URL:
-   * facebook.com/CivicFS points at a dormant page that has never advertised. */
-  { label: 'page:civic',        url: page('636579392871947') },  //  3
-  { label: 'page:renovo',       url: page('232025073545293') },  //  2
-  { label: 'page:templeview',   url: page('1790851891232875') }, //  2
-
-  /* Tracked but silent — confirmed zero ads ever. Kept so we notice the day
-   * one of them starts spending. */
-  { label: 'page:easystreet', url: page('161927707529642') },
-  { label: 'page:upright',    url: page('405332459610678') },
-  { label: 'page:velocity',   url: page('796752613736461') },
-  { label: 'page:longhorn',   url: page('126610117257') }
+  { label: 'kw:ai-video',        category: 'ai-video',    url: kw('AI video generator') },
+  { label: 'kw:faceless-video',  category: 'ai-video',    url: kw('faceless videos AI') },
+  { label: 'kw:clips',           category: 'repurposing', url: kw('turn long videos into short clips') },
+  { label: 'kw:repurpose',       category: 'repurposing', url: kw('repurpose content AI') },
+  { label: 'kw:ai-writing',      category: 'ai-writing',  url: kw('AI LinkedIn posts') },
+  { label: 'kw:ai-content',      category: 'ai-writing',  url: kw('AI content writer social media') },
+  { label: 'kw:scheduler',       category: 'scheduling',  url: kw('social media scheduler') },
+  { label: 'kw:schedule-posts',  category: 'scheduling',  url: kw('schedule posts Instagram TikTok') },
+  { label: 'kw:ai-manager',      category: 'all-in-one',  url: kw('AI social media manager') },
+  { label: 'kw:ai-marketing',    category: 'all-in-one',  url: kw('AI marketing assistant small business') },
+  { label: 'kw:brand-agency',    category: 'agency',      url: kw('personal brand agency founders') },
+  { label: 'kw:ghostwriting',    category: 'agency',      url: kw('LinkedIn ghostwriting agency') },
 ];
 
 function kw(q) {
@@ -67,8 +47,8 @@ function page(id) {
     `&view_all_page_id=${id}&media_type=all`;
 }
 
-/* A page-id target legitimately returns zero (six lenders have never advertised),
- * so health is judged on the keyword sweeps only. */
+/* A page-id target can legitimately return zero (a company that never
+ * advertises), so health is judged on the keyword sweeps only. */
 const MIN_TOTAL_ADS = 15;
 const MIN_KEYWORD_TARGETS_WITH_RESULTS = 2;
 
@@ -155,7 +135,7 @@ for (const t of TARGETS) {
   try {
     const rows = await sweep(pg, t);
     perTarget[t.label] = rows.length;
-    rows.forEach((r) => results.push({ ...r, source: t.label }));
+    rows.forEach((r) => results.push({ ...r, source: t.label, category: t.category ?? null }));
     console.log(`${t.label.padEnd(20)} ${rows.length}`);
   } catch (err) {
     perTarget[t.label] = null; // null = errored, distinct from a real zero
@@ -185,7 +165,7 @@ if (!healthy) {
   console.error(
     `\nUNHEALTHY PULL — ${results.length} ads, ${keywordHits} keyword targets returned rows.\n` +
     'Refusing to continue so a blocked or broken run cannot overwrite good data ' +
-    'or publish an empty page. Most likely cause: Meta challenged this IP.'
+    'or empty the Competitors page. Most likely cause: Meta challenged this IP.'
   );
   process.exit(1);
 }

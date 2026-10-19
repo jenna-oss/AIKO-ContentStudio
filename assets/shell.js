@@ -181,8 +181,8 @@
 
     var menu = el('div', { class: 'menu', role: 'menu', 'aria-label': 'Account', hidden: true, style: { top: '50px', right: '0', width: '270px' } });
     var research = el('div', { class: 'menu', role: 'menu', 'aria-label': 'Research', hidden: true, style: { top: '50px', right: '48px', width: '240px' } },
-      el('a', { class: 'mi', role: 'menuitem', href: './briefing.html' }, el('span', {}, 'Competitors', el('span', { class: 'quiet', style: { display: 'block' } }, 'What lenders are advertising'))),
-      el('a', { class: 'mi', role: 'menuitem', href: './creators.html' }, el('span', {}, 'Creators', el('span', { class: 'quiet', style: { display: 'block' } }, 'Who teaches this audience'))));
+      el('a', { class: 'mi', role: 'menuitem', href: './competitors.html' }, el('span', {}, 'Competitors', el('span', { class: 'quiet', style: { display: 'block' } }, 'What AI content tools advertise'))),
+      el('a', { class: 'mi', role: 'menuitem', href: './creators.html' }, el('span', {}, 'Creators', el('span', { class: 'quiet', style: { display: 'block' } }, 'Who teaches founders to win clients'))));
     var researchBtn = el('button', { type: 'button', class: 'app-tab', 'aria-expanded': 'false', 'aria-current': active === 'research' ? 'page' : null }, 'Research');
     var avatar = el('button', { type: 'button', class: 'avatar', 'aria-label': 'Account', 'aria-expanded': 'false', html: '<svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" aria-hidden="true"><circle cx="12" cy="8" r="4"></circle><path d="M4 21c1.5-4 4.5-6 8-6s6.5 2 8 6"></path></svg>' });
 

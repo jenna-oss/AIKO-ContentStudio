@@ -8,7 +8,7 @@ name: Daily creator pull
 # creator and needs no browser. Coupling them would mean a Meta IP challenge
 # takes the creators page down with it.
 #
-# Unlike briefing.html, creators.html fetches its JSON in the browser, so
+# creators.html fetches its JSON in the browser, so
 # there is no render step — rewriting the data files is the whole publish.
 #
 # Cost note: Spyglass bills credits per row returned. Twelve rows per creator
@@ -71,28 +71,11 @@ jobs:
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API }}
         run: node tools/creator-hooks.mjs
 
-      # The reach comparison: best organic post, creators against the nine board
-      # lenders. Runs after the harvest because the creator half is read from
-      # the screened roster that step just wrote.
-      #
-      # This is the expensive addition -- nine more brands a day -- and it is
-      # the section that most needs to be current, since its heading makes a
-      # live claim about who this audience watches.
-      #
-      # Not allowed to sink the run, for the same reason as the hook library:
-      # the roster is already written by this point.
-      - name: Refresh the reach comparison
-        id: reach
-        continue-on-error: true
-        env:
-          SPYGLASS_API_KEY: ${{ secrets.SPYGLASS_API_KEY }}
-        run: node tools/pull-reach.mjs
-
       - name: Commit and push
         run: |
           git config user.name  "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add data/education-creators.json data/creator-hook-patterns.json data/reach.json
+          git add data/education-creators.json data/creator-hook-patterns.json
           if git diff --staged --quiet; then
             echo "No change in creators or hook patterns today."
             exit 0
@@ -116,13 +99,6 @@ jobs:
           done
           echo "::error::Could not push after 3 attempts."
           exit 1
-
-      - name: Flag a stale reach comparison
-        if: steps.reach.outcome == 'failure'
-        run: |
-          echo "::warning::The reach comparison did not refresh; the chart still shows the previous figures."
-          echo "It refuses to write unless BOTH halves have rows — creators with no lenders"
-          echo "to measure against would leave the heading claiming a gap the chart no longer shows."
 
       - name: Flag a stale hook library
         if: steps.hooks.outcome == 'failure'
