@@ -38,7 +38,10 @@ const HANDLE = '@aikogroup.ai'
 const ENV_HINT = (BAKED_ROOT || ARGS.root)
   ? 'the ELEVENLABS_API_KEY environment variable (already set on this runner)'
   : `${PROJECT_ROOT}/.env (ELEVENLABS_API_KEY)`
-const VOICE_ID = '56bWURjYFHyYyVf490Dp'
+// AIKO's narrator. The ElevenLabs voice the Trilith tool used belongs to The
+// Buy Box, so this has to be set to AIKO's own before a render. Kept in step
+// with VOICE_ID in remotion/voiceover_TEMPLATE.py.
+const VOICE_ID = 'SET-AIKO-VOICE-ID'
 
 const BRIEF = normaliseBrief(BAKED_BRIEF || ARGS.brief || ARGS.topic)
 
@@ -68,6 +71,9 @@ function normaliseBrief(b) {
     hook: text(b.hook) || text(b.opening_line),
     evidence: text(b.evidence),
     audience: text(b.audience),
+    // The plan's `product` field holds the job this video does (echo, reframe,
+    // tactic, door); see worker/src/plan.js.
+    job: text(b.product),
     sources: sources.filter(s => typeof s === 'string' && s.trim()).map(s => s.trim()),
     // Set when an earlier version was edited on the Output page but its source
     // wasn't kept, so the video is being re-made with the change in it.
@@ -84,19 +90,25 @@ function normaliseBrief(b) {
   return brief
 }
 
-// No PRODUCT line, even when the plan has one: plans carried a lender's
-// product from before the channel became The Buy Box, and the videos pitch
-// nothing. Their only ask is to follow the channel.
+// The four jobs from AIKO's posting rotation, so the script knows whether this
+// video teaches or invites.
+const JOBS = {
+  echo: 'echo -- say the thing the founder thinks but never says out loud, so they feel understood before anything is shown',
+  reframe: 'reframe -- shift the belief: the gap is not talent or effort, it is presence',
+  tactic: 'tactic -- give away one real, usable piece of the method; the measure is whether they would save it',
+  door: 'door -- show the tool doing it and what it costs the founder in minutes, then invite plainly',
+}
 function briefBlock() {
   return [
     `TOPIC: ${BRIEF.topic}`,
     BRIEF.goal && `BATCH GOAL: ${BRIEF.goal}`,
     BRIEF.angle && `ANGLE: ${BRIEF.angle}`,
     BRIEF.hook && (HOOK_LOCKED
-      ? `OPENING LINE (locked, spoken to camera): ${BRIEF.hook}`
+      ? `OPENING LINE (locked, spoken by the narrator): ${BRIEF.hook}`
       : `OPENING LINE (from the plan; the change requested may replace it): ${BRIEF.hook}`),
     BRIEF.evidence && `EVIDENCE ALREADY GATHERED: ${BRIEF.evidence}`,
-    BRIEF.audience && `AUDIENCE: ${BRIEF.audience}`,
+    BRIEF.job && `JOB: ${JOBS[BRIEF.job] || BRIEF.job}`,
+    BRIEF.audience && `FOUNDER NICHE: ${BRIEF.audience}`,
     BRIEF.sources.length && `SOURCES:\n${BRIEF.sources.map(s => `- ${s}`).join('\n')}`,
     revisionBlock(),
   ].filter(Boolean).join('\n\n')
@@ -125,42 +137,52 @@ what the note asks.`
 // hard horizon: an Electric field meeting a Tangerine field on a straight edge.
 const BACKGROUNDS = ['electric', 'tangerine', 'paper', 'ink', 'deep', 'horizon', 'footage']
 
-// The videos were reading as lectures, so the opening sells what the money
-// makes possible and the lesson follows (2026-09-19).
-const LIFESTYLE = `WHAT THE VIDEO IS FOR: someone watches because of what investing could pay for -- the house, the
-month they stop trading hours for money, the trip they didn't have to save two years for. Open there, then teach
-the one thing that gets them closer. The lesson stays; the lecture goes.
-- Beats 1 to 3 are about the life, not the mechanics, and they say where it comes from: doing this is how the
-  money gets made. Name something concrete a person can picture, in their words, not a category ("two flips a
-  year is the deposit on the house you actually want", not "portfolio diversification"), and tie it to the
-  method in the same breath. No definitions in them, and no acronyms.
-- The spine of every video is the route: this is how people build real money in property, here is the one
-  thing that decides whether you get it, and that is what pays for the life. State the route plainly once, in
-  the viewer's words. A video that only teaches a mechanism, or only warns about one, has missed the point.
-- From beat 4 the video earns it: the one idea that gets them there, in plain words, built to the takeaway, and
-  each mechanical beat says what it does for them, not only how it works.
-- Every line is one breath: 8 to 14 words, and never more than 18. A 23-word line is read at nearly twice
-  the pace of a short one, which is what makes a script sound uneven.
-- At most three beats carry a figure, spelled out or not ("ten percent" counts), and at most two acronyms
-  appear in the whole script. Better still, drop
-  the term: say what it does in plain words, and name it only when the video is about the term itself. Scripts
-  that read as a string of ratios and acronyms are the thing being fixed here.
-- The takeaway says what this builds for them -- the money, the next deal, the life it pays for -- not what a
-  term means and not only what to avoid.
-- The loss case earns one beat at most, and the beat after it says what the gain is when you get it right.
-  Never leave the last word with the downside.
-- Every video makes the same case: investing in property builds wealth. Say it plainly, and back it with the
-  figures the research gave you -- what the deal earns, keeps or is worth in five years. A video about a fee, a
-  mistake or a risk makes the case by showing how to keep the gain, never by leaving the impression the thing
-  is not worth doing.
-- Still the brand voice: no hype, no promises about the future, no "get rich". The life is shown as what the
-  math makes possible, and the math is why it's believable.`
+// What the tool really does. The scripts advertise it, so they may say these
+// things about it and nothing else: no invented feature, price, result or customer.
+const PRODUCT_FACTS = `THE TOOL (AIKO Content Studio, self-serve -- the founder runs it). Say only these things about it:
+- The founder plans a week or a month of videos in one conversation. Asked "what should I post this week?",
+  it suggests topics from their industry's news, newsletters and what competitors are saying. They swap
+  anything in plain words, then lock the plan.
+- Each locked topic comes back a few minutes later as a finished, faceless educational video: voiced,
+  captioned, in the founder's own brand colours, fonts and voice. Nothing to assemble.
+- Changes are typed, not edited: "make the opening punchier", "bigger captions". No timeline, no editing skills.
+- The founder picks the days and approves; videos post to TikTok, Instagram, YouTube and Facebook on schedule.
+- Guardrails: nothing is made until the plan is locked, nothing is posted until it is approved.
+- A founder who prefers to be on camera can upload one long take and get short captioned clips, each opening
+  on its strongest line.
+Never invent a feature, a price, a result, a statistic or a customer.`
+
+// The videos advertise the tool by being useful first: the opening is about
+// the client the founder wants, and the tool arrives as how it gets done.
+const LIFESTYLE = `WHAT THE VIDEO IS FOR: a founder in a trust-led, high-ticket business watches because of the client they
+want and the place they want in their niche -- the owner who has read their posts for a year and calls them
+first, the referral that arrives already convinced. Open there, then show how it gets done. The lesson stays;
+the lecture and the sales pitch both go.
+- Beats 1 to 3 are about the founder's clients and position, not the mechanics. Name something concrete a
+  person can picture, in their words, not a category ("the owner who calls you first because he has watched you
+  explain earnouts for a year", not "brand awareness"). No marketing or AI jargon in them.
+- The spine of every video is the route: their buyers research in private for months; the person who taught
+  them in public is the one who gets the call; a system that runs on minutes a month is how a founder with no
+  time does that; this tool is that system. State the route plainly once, in the viewer's words.
+- From beat 4 the video earns it: the one idea, in plain words, built to the takeaway. When it shows the tool,
+  show one step and what it costs the founder in minutes, using only THE TOOL facts above. Show the machine and
+  its guardrails rather than calling it powerful.
+- Every line is one breath: 8 to 14 words, and never more than 18.
+- At most three beats carry a figure, spelled out or not, and at most two acronyms besides AI appear in the
+  whole script. Better still, say what a thing does in plain words.
+- The takeaway says what this builds for them -- the client, the call, the authority in their niche -- not
+  what a term means and not only what to avoid.
+- The loss case earns one beat at most (the competitor with half their experience who gets the call because
+  he shows up), and the beat after it says what changes when they show up instead.
+- How it should feel: equipped, inevitable, bigger. Never relief or rescue: no "overwhelmed", no "struggling",
+  no "drowning". Measure clients, calls and conversations, never followers, views or going viral.
+- No hype, no promises about results, no invented statistics. Figures come from the facts above or not at all.`
 
 const RESEARCH_SCHEMA = {
   type: 'object',
   required: ['slug', 'workingTitle', 'sourcedFacts', 'sourceUrls', 'keyTerms'],
   properties: {
-    slug: { type: 'string', description: 'lowercase-hyphenated short identifier for this topic, e.g. "arnold-schwarzenegger"' },
+    slug: { type: 'string', description: 'lowercase-hyphenated short identifier for this topic, e.g. "buyers-research-in-private"' },
     workingTitle: { type: 'string' },
     sourcedFacts: {
       type: 'array',
@@ -174,7 +196,7 @@ const RESEARCH_SCHEMA = {
     missingNumbers: { type: 'string', description: 'note any hard numbers (rates, ratios, dates) the sources do not provide -- never invent them' },
     keyTerms: {
       type: 'array',
-      description: 'every term, acronym or concept in this topic that someone brand new to real estate investing would not know',
+      description: 'every marketing, social-media or AI term in this topic that an expert founder who has never done marketing would not know',
       items: {
         type: 'object',
         required: ['term', 'plainMeaning'],
@@ -232,11 +254,12 @@ const BEGINNER_CHECK_SCHEMA = {
       items: { type: 'object', required: ['beat', 'why'], properties: { beat: { type: 'number' }, why: { type: 'string' } } },
     },
     whatILearned: { type: 'string', description: 'in one plain sentence, what the viewer now understands; empty if nothing clear' },
-    whatItGetsMe: { type: 'string', description: 'in one plain sentence, what this video says could change in your own life; empty if it never says' },
-    feltLikeALesson: { type: 'boolean', description: 'true if it played like a lesson or a list of terms rather than something that made you want in' },
-    leftMeWantingIn: { type: 'boolean', description: 'true if it left you thinking that owning property is a way to build wealth; false if it left you cold or put you off' },
-    openedOnTheLife: { type: 'boolean', description: 'true if the first three lines were about what this means for someone\'s life or money; false if they were already explaining how something works' },
-    theRouteItShowed: { type: 'string', description: 'in one plain sentence, what this video said the way to more money is; empty if it never said, or if it only warned you about something' },
+    whatItGetsMe: { type: 'string', description: 'in one plain sentence, what this video says could change for your practice; empty if it never says' },
+    feltLikeALesson: { type: 'boolean', description: 'true if it played like a lecture or a list of terms rather than something that made you want in' },
+    feltLikeAPitch: { type: 'boolean', description: 'true if it felt like a sales pitch or an ad rather than something worth watching for its own sake' },
+    leftMeWantingIn: { type: 'boolean', description: 'true if it left you thinking that showing up and teaching in public is how you win clients, and that a tool like this is how you would manage it; false if it left you cold or put you off' },
+    openedOnTheClient: { type: 'boolean', description: 'true if the first three lines were about your clients, your deals or your place in your niche; false if they were already explaining how something works' },
+    theRouteItShowed: { type: 'string', description: 'in one plain sentence, what this video said the way to win more clients is; empty if it never said, or if it only warned you about something' },
   },
 }
 
@@ -401,7 +424,9 @@ Write the scene components inline in the new video file.`
 
 phase('Research')
 const research = await agent(
-  `Research this brief for a short-form vertical educational video about real estate/finance.
+  `Research this brief for a short-form vertical educational video for founders of expertise-led, high-ticket
+businesses (M&A advisors, CRE brokers and the like) about winning clients through social media, and how AI
+makes that possible on minutes a month.
 
 ${briefBlock()}
 
@@ -414,12 +439,19 @@ gaps. Cross-check facts against 2-3 sources when possible. Extract dated, specif
 explicitly in missingNumbers rather than making them up. Where the brief's EVIDENCE or OPENING LINE states
 a figure, confirm it from a source, or say in missingNumbers that it could not be confirmed.
 
-The video is for people brand new to real estate investing. So also list keyTerms: every term, acronym
-or concept this topic depends on that such a person would not know (for example DSCR, PITIA, loan-to-cost,
-a construction draw, a bridge loan), each with a one-sentence plainMeaning in everyday words and with no
-other jargon inside it. For an acronym, say what the letters stand for first.
+Facts about the tool itself come from THE TOOL below, never from the web; do not research or cite competing
+tools' claims as if they were facts about it. Statistics about buyers, social media or AI must come from a
+named, dated source; a figure you cannot source goes in missingNumbers, never in the facts.
 
-Also produce a lowercase-hyphenated "slug" for this topic (e.g. "arnold-schwarzenegger", "cap-rate-explainer")
+${PRODUCT_FACTS}
+
+The video is for founders who know their own field deeply and have never done marketing. So also list
+keyTerms: every marketing, social-media or AI term this topic depends on that such a person would not know
+(for example GTM, the algorithm, a funnel, engagement, a content pillar, a prompt), each with a one-sentence
+plainMeaning in everyday words and with no other jargon inside it. For an acronym, say what the letters
+stand for first.
+
+Also produce a lowercase-hyphenated "slug" for this topic (e.g. "buyers-research-in-private", "twenty-minutes-a-month")
 -- it will be used as a file/folder name, so keep it short, no spaces, no special characters besides hyphens.`,
   { schema: RESEARCH_SCHEMA, label: 'research' }
 )
@@ -434,38 +466,37 @@ log(`Researched "${research.workingTitle}" (slug: ${research.slug}), ${(research
 
 phase('Script')
 
-// The Buy Box brand guide (v1.1, Sep 2026): personality, voice and tone, as
-// the Script stage's standing orders. The Say this / Not this pairs are the
-// guide's own examples.
-const BRAND_VOICE = `THE CHANNEL: The Buy Box (@thebuyboxre), a real estate investing channel. Never mention Trilith, and
-never speak as a lender or pitch a product ("we fund", "our rates", "ours means"). Some briefs and sources
-still carry a lender's name or products from before the channel launched: keep the idea, drop the name.
-These videos build the channel; their only ask is to follow it.
+// The AIKO positioning (v1): who is talking, the voice, and the tone per beat,
+// as the Script stage's standing orders. The Say this lines are the
+// positioning's own.
+const BRAND_VOICE = `THE ACCOUNT: AIKO Group (@aikogroup.ai). These videos advertise AIKO Content Studio to the founders who would
+run it, by being worth watching first. Their only ask is to follow AIKO. Never name a competing tool, app or
+agency; "a branding agency" or "a chatbot" in general is fine.
 
-WHO IS TALKING: the person on the other side of the underwriting desk, who wants your deal to work and
-will tell you plainly when it doesn't. They have been deep in hundreds of deals, the good, the bad and the
-ugly, and it has not made them arrogant toward investors at the start of their journey. They are patient,
-and use deep expertise to turn complex ideas into simple lessons for beginners.
+WHO IS TALKING: a narrator in AIKO's voice, never on camera. An AI engineer's precision with a private
+advisor's calm: knows exactly where generic AI goes wrong, respects the founder's expertise, and is on their
+side. The founder is the hero; the tool is the instrument. The narrator speaks to the founder as "you" and
+says "AIKO", never "I" or "we".
 
-VOICE (fixed, whatever the topic): an experienced real estate investor-operator. Confident, backed by
-data, to the point. Credibility over reach.
-- We are: experienced, beginner friendly, confident about the math.
-- We are not: superior, dumbed down, certain about the future.
-So: no hype, no talking down ("obviously", "everyone knows"), and no promises or predictions. Say what
-the numbers show, not what will happen.
+VOICE (fixed, whatever the topic): engineered and premium -- closer to a precision instrument or a private
+advisory firm than a marketing agency or a software ad. Short and declarative, then the turn that reframes it.
+- We are: precise, calm, concrete, on the founder's side, showing the machine.
+- We are not: hype, salesy, rescuing, jargon-heavy, certain about results.
+- Say: your voice, content system, educational content, authority in your niche, minutes from you, the person
+  your niche learns from.
+- Never say: branding, campaigns, marketing services, ads, content creation, retainer -- except to say what
+  this is not ("not a branding agency").
 
 TONE (depends on the beat):
-- Hook: sharp, declarative, a little confrontational.
-  Say this: "This deal made four thousand dollars. It took eleven months."
-  Not this: "You won't BELIEVE what happened with this flip."
-- Deal breakdown: neutral; let the numbers carry it.
-  Say this: "185 purchase, 60 rehab, comps at 340. That is 72% all-in on ARV, with about 15k of room."
-  Not this: "The numbers on this one are absolutely incredible."
-- Beginner explainer: patient and plain.
-  Say this: "Points are prepaid interest. Two points on 300k is 6,000 at closing, and it buys down your rate."
-  Not this: "Obviously you'll want to weigh points against rate."
-The examples set the register, not a licence for jargon: terms like ARV and comps still get explained the
-first time they come up, as the beginner rules below require.`
+- Hook: a statement, then the turn.
+  Say this: "Nobody hires the best person. They hire the one they remember."
+  Not this: "Struggling to keep up with social media?"
+- The machine (showing the tool): neutral and exact; name the step and its time cost.
+  Say this: "You ask what to post this week. It answers from your industry's news."
+  Not this: "Our revolutionary AI does everything for you."
+- The tactic: patient and plain; give away one real, usable piece.
+  Say this: "Write down the last five questions a client asked you. That is five videos."
+  Not this: "Leverage your expertise to create value-driven content."`
 
 const hookStep = HOOK_LOCKED
   ? `The opening line is already decided: it was locked on the Plan page. Beat 1 is exactly this line,
@@ -483,42 +514,42 @@ ${BRIEF.hook}
 
 This is a re-make, so it is not locked. Keep it as beat 1, word for word, unless the change requested above
 asks for a different opening or the line no longer fits what the video now says. Then write a new opening line
-in the brand's hook tone: sharp, declarative, a little confrontational, no hype. Report hookCategory "LOCKED"
+in the brand's hook tone: short and declarative, then the turn, no hype. Report hookCategory "LOCKED"
 and hookTemplate "(from the plan)" if you kept it, or "BRAND" and "(written to the brand guide)" if you wrote a
 new one, and filledHook as beat 1.`
   : `Read the hook template library at ${HOOK_LIBRARY_PATH} (a JSON object of {category: [templates...]}).
 Pick ONE category and ONE specific template that fits this brief's angle AND, once filled, reads as the
-brand's hook tone: sharp, declarative, a little confrontational. Skip anything that reads as hype or
-clickbait. Fill its (insert X) placeholders with real details from the facts above -- do not invent facts.
+brand's hook tone: short and declarative, then the turn. Skip anything that reads as hype, clickbait or
+relief ("struggling to...?"). Fill its (insert X) placeholders with real details from the facts above -- do not invent facts.
 Report both the raw template (hookTemplate, placeholders intact) and the filled version (filledHook). If
 no template can meet the hook tone, write the hook yourself in that tone and report hookCategory "BRAND"
 and hookTemplate "(written to the brand guide)". The filledHook is beat 1.
-Whichever way it comes, beat 1 names the money: a figure the viewer can picture -- a monthly income, a
-deposit, a sale price, a number of deals a year, "five figures" -- taken from the facts above.`
+Whichever way it comes, beat 1 names something concrete the founder can picture: a time cost ("twenty
+minutes"), a stretch of time ("a year of quiet research"), a client, a call, a deal, a referral.`
 
-// Every video has to work for someone who has never invested in real estate.
-const BEGINNER_RULES = `WHO THIS IS FOR: someone brand new to real estate investing. They should follow every line
-and come away having learned something real, with no background at all. People who already invest
-should still find it worth watching: clear, not dumbed down.
-- Prefer the plain words to the term: "rent divided by the payment" beats naming the ratio, and a video
-  that never says the acronym is usually the clearer one. Name a term only where the video is about it, or
-  where they will meet it on a lender's page and need it.
+// Every video has to work for a founder who is an expert in their own field
+// and has never done marketing.
+const BEGINNER_RULES = `WHO THIS IS FOR: the owner of an expertise-led business -- an M&A advisor, a CRE broker, a CPA -- who
+knows their own field deeply and has never done marketing or used AI for it. They should follow every line
+without any marketing or tech vocabulary, and come away with something real they could use.
+- Prefer the plain words to the term: "how you win clients" beats GTM, "the people who might hire you" beats
+  audience or funnel, "what the app decides to show" beats the algorithm. Name a term only where the video is
+  about it.
 - Any term you do use is explained in plain words the first time it comes up, in that beat or the very next
-  one. The key terms above come with plain meanings; use them. Never use a term before it has been
-  explained, except in a locked opening line, which stays as written; if that line uses jargon, beat 2
-  unpacks it.
-- For an acronym, say once what the letters stand for and what it means in everyday terms.
-- One idea per beat. Short sentences. Everyday words. Give every number its meaning ("$4,500 a month
-  in rent", not "four-point-five gross").
-- No insider slang ("pencil out", "BRRRR", "LTC", "points", "comp factors") unless you explain it.
-- Build to ONE clear takeaway a beginner could repeat to a friend. Say it plainly near the end, and
+  one. The key terms above come with plain meanings; use them. A locked opening line stays as written; if it
+  uses a term, beat 2 unpacks it.
+- Talk about their world in their words: deals, mandates, clients, referrals, the owner thinking about selling.
+  Use an M&A or CRE example unless the brief names another niche.
+- One idea per beat. Short sentences. Everyday words. Give every number its meaning ("twenty minutes a month
+  from you", not "20 min/mo").
+- Build to ONE clear takeaway the founder could repeat to a colleague. Say it plainly near the end, and
   report it as takeaway.`
 
 function writeScript(fix, draft, round) {
   return agent(
     `Write the script for a short-form vertical video from this brief. The brief was locked by a person on
-the Plan page: the script carries its ANGLE and speaks to its AUDIENCE in a way a complete beginner can
-also follow. Do not drift to a different story.${REMAKE_NOTE}
+the Plan page: the script carries its ANGLE and speaks to its AUDIENCE (the founder niche) in a way any
+expert founder who has never done marketing can follow. Do not drift to a different story.${REMAKE_NOTE}
 
 ${briefBlock()}
 
@@ -531,6 +562,8 @@ ${(research.keyTerms || []).map(k => `- ${k.term}: ${k.plainMeaning}`).join('\n'
 
 ${BRAND_VOICE}
 
+${PRODUCT_FACTS}
+
 ${LIFESTYLE}
 
 ${BEGINNER_RULES}
@@ -538,21 +571,20 @@ ${BEGINNER_RULES}
 ${hookStep}
 
 Then write a full beat-by-beat script: 8-13 beats, each a short natural spoken line (these get narrated
-by a cloned voice, so keep them punchy -- 8-14 words per beat is typical, not full paragraphs) with an
-estSeconds guess. The script should read as one connected story, not isolated facts. The scripts in
-${PROJECT_ROOT}/data/script_*.json show this account's beat length and pacing; use them for that only,
-because their tone predates the brand guide and the brand voice above wins.
+by AIKO's narrator voice, so keep them punchy -- 8-14 words per beat is typical, not full paragraphs) with an
+estSeconds guess. The script should read as one connected story, not isolated facts.
 
 For each beat, give emphasis: the one or two words from that line a viewer should catch -- the number,
 the key term, the verdict -- copied exactly as they appear in the line. They turn Tangerine in the captions.
 
-The last beat asks the viewer to follow The Buy Box, in the brand voice: one short line, tied to what the
-video just taught, with no hype (e.g. "Follow The Buy Box for the math on the next deal.").${draft ? `
+The last beat asks the viewer to follow AIKO, in the brand voice: one short line, tied to what the video
+just showed, with no hype (e.g. "Follow AIKO for the next twenty minutes that matter."). Say "AIKO", not the
+handle: the closing frame shows ${HANDLE}.${draft ? `
 
 Your previous draft:
 ${draft.beats.map(b => `${b.order}. ${b.line}`).join('\n')}
 
-It was checked by someone new to real estate investing and against the brand guide. Fix these and keep
+It was checked by a founder who has never done marketing and against the brand voice. Fix these and keep
 what works:
 ${fix}` : ''}`,
     { schema: SCRIPT_SCHEMA, label: round ? `script-revision-${round}` : 'script' }
@@ -564,8 +596,9 @@ ${fix}` : ''}`,
 // will too.
 function beginnerCheck(s, round) {
   return agent(
-    `You are watching a short video about real estate investing. You know nothing about the subject: you have
-never bought a property, never borrowed money for one, and don't know any industry terms or acronyms.
+    `You are watching a short video on Instagram. You run a small M&A advisory practice: you know your own field
+deeply, you win work through referrals and reputation, and you have never done marketing. You don't know
+marketing, social-media or AI terms, and you have never used a tool that makes videos for you.
 
 This is everything the narrator says, beat by beat, in order. You hear each line once.
 
@@ -577,17 +610,17 @@ Be strict, as that viewer. Report:
 - confusingBeats: any beat where you would lose the thread, and why, in a few words.
 - whatILearned: in one plain sentence, what you now understand that you didn't before. Leave it empty if
   you came away with nothing clear.
-- whatItGetsMe: in one plain sentence, what this says could change in your own life -- the money, the time, the
-  thing you could do next. Leave it empty if the video never says, and do not invent one from the subject.
-- feltLikeALesson: true if it played like a lesson or a run of terms and ratios, rather than something that made
-  you want in.
-- leftMeWantingIn: true if, on what it showed you, owning property came across as a way to build wealth. False
-  if it left you cold, or put you off the idea.
-- openedOnTheLife: true if the first three lines were about what this means for someone -- their money, their
-  year, what they could do next. False if they were already explaining how something works, defining a thing,
-  or walking through a process.
-- theRouteItShowed: in one plain sentence, what this said the way to more money is -- what someone does, and
-  what it gets them. Leave it empty if it never said, or if all it did was warn you off something.
+- whatItGetsMe: in one plain sentence, what this says could change for your practice -- the clients, the calls,
+  the time it takes. Leave it empty if the video never says, and do not invent one from the subject.
+- feltLikeALesson: true if it played like a lecture or a run of terms, rather than something that made you
+  want in.
+- feltLikeAPitch: true if it felt like a sales pitch or an ad more than something worth watching for itself.
+- leftMeWantingIn: true if, on what it showed you, showing up and teaching in public came across as how you win
+  clients, and a tool like this as how you would manage it. False if it left you cold, or put you off.
+- openedOnTheClient: true if the first three lines were about your clients, your deals or your place in your
+  niche. False if they were already explaining how something works, defining a thing, or listing features.
+- theRouteItShowed: in one plain sentence, what this said the way to win more clients is -- what you do, and
+  what it gets you. Leave it empty if it never said, or if all it did was warn you off something.
 Report only real problems. A clear script comes back with both lists empty.`,
     { schema: BEGINNER_CHECK_SCHEMA, label: `beginner-check-${round}` }
   )
@@ -600,50 +633,50 @@ function beginnerIssues(r) {
   ]
   if (!String(r.whatILearned || '').trim()) out.push('no clear takeaway: the listener came away with nothing they could name')
   if (!String(r.whatItGetsMe || '').trim()) {
-    out.push('the listener could not say what this would change in their life: open on that and keep it in sight')
+    out.push('the listener could not say what this would change for their practice: open on their clients and keep them in sight')
   }
-  if (r.feltLikeALesson) out.push('it played as a lesson rather than something the listener wanted in on')
+  if (r.feltLikeALesson) out.push('it played as a lecture rather than something the listener wanted in on')
+  if (r.feltLikeAPitch) out.push('it felt like an ad: earn the attention with something useful first, and show the tool as how it gets done')
   if (r.leftMeWantingIn === false) {
-    out.push('it did not leave the listener thinking property builds wealth: show what the deal earns or keeps, with the figures')
+    out.push('it did not leave the listener thinking that showing up is how they win clients: make the route plain, and show the tool doing one step')
   }
-  if (r.openedOnTheLife === false) {
-    out.push('the first three beats explained rather than landed what it means for them: open on the life and leave the mechanics to beat 4')
+  if (r.openedOnTheClient === false) {
+    out.push('the first three beats explained rather than landed what it means for their clients: open on the client and leave the mechanics to beat 4')
   }
   if (r.theRouteItShowed !== undefined && !String(r.theRouteItShowed || '').trim()) {
-    out.push('the listener could not say what route to more money this showed: say plainly that doing this is how the money gets made, and what it pays for')
+    out.push('the listener could not say what route to more clients this showed: say plainly that teaching in public is how they get the call, and how the tool makes that minutes a month')
   }
   return out.length ? out.join('\n') : null
 }
 
-// The measurable half of leading with the life: a script heavy with figures,
-// acronyms or definitions is the thing being fixed, and counting is cheaper
-// and steadier than asking. Definitions and terms are still allowed where the
-// video is about the term; the limits are what stop every line being one.
+// The measurable half of leading with the client: a script heavy with figures,
+// acronyms or definitions reads as a lecture, and counting is cheaper and
+// steadier than asking. AI is everywhere in these scripts and is not counted.
 const ACRONYM = String.raw`\b(?:[A-Z]\.){2,}[A-Z]?|\b[A-Z]{2,5}\b`
-// Only the unmistakable markers: "X is the Y" catches lifestyle lines as
-// often as definitions ("that gap is the deposit you were saving for"), so
-// whether the opening explains rather than sells is left to the listener.
+// Only the unmistakable markers: "X is the Y" catches ordinary lines as often
+// as definitions, so whether the opening explains rather than lands is left to
+// the listener.
 const DEFINING = /\b(means|is called|stands for|defined as|in other words|that's called|known as|refers to)\b/i
-// A figure counts whether it is written 10% or "ten percent": the first
-// lifestyle-framed script spelled every number out and slipped the count.
-const SPELLED = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b[\s\w-]{0,24}\b(percent|dollars?|points?|days?|weeks?|months?|years?|times|grand|figures)\b/i
+// A figure counts whether it is written 20 or "twenty minutes".
+const SPELLED = /\b(one|two|three|four|five|six|seven|eight|nine|ten|eleven|twelve|thirteen|fourteen|fifteen|sixteen|seventeen|eighteen|nineteen|twenty|thirty|forty|fifty|sixty|seventy|eighty|ninety|hundred|thousand|million)\b[\s\w-]{0,24}\b(percent|dollars?|points?|minutes?|hours?|days?|weeks?|months?|years?|times|clients?|deals?|videos?|posts?)\b/i
 const hasFigure = (line) => /\d/.test(line) || SPELLED.test(line)
-// A takeaway may be a caution, but not only a caution: "miss this and the
-// schedule slips" leaves nothing in the viewer's hands, while "rent below the
-// payment is not an automatic no" is a verdict and stands on its own.
-const GAIN = /\b(pays?|paid|payday|earns?|keeps?|buys?|builds?|funds?|worth|profit|income|equity|wealth|cash|returns?|own|owns?|yours)\b/i
+// Beat 1 names something concrete: a time cost, a stretch of time, a client,
+// a call. The same test lock_video runs on the Plan page (worker/src/plan.js).
+const CONCRETE = /\d|\b(?:one|two|three|four|five|six|seven|eight|nine|ten|twelve|twenty|thirty|forty|fifty|hundred)\b|\b(?:minutes?|hours?|days?|weeks?|months?|years?|clients?|buyers?|owners?|calls?|deals?|referrals?|enquir(?:y|ies)|inquir(?:y|ies)|conversations?|meetings?|phone)\b/i
+// A takeaway may be a caution, but not only a caution: it ends on what this
+// builds for them.
+const GAIN = /\b(clients?|calls?|referrals?|deals?|mandates?|trust(?:ed|s)?|authority|remember(?:ed|s)?|hired?|chosen|known|found|visible|learns? from|yours?|minutes?)\b/i
 const WARNING = /\b(miss|missing|avoid|don'?t|never|beware|careful|watch out|risk|lose|loses|losing|lost|mistake|before you|or you)\b/i
-const acronymsIn = (line) => (String(line).match(new RegExp(ACRONYM, 'g')) || []).map(a => a.replace(/\./g, ''))
+const acronymsIn = (line) => (String(line).match(new RegExp(ACRONYM, 'g')) || [])
+  .map(a => a.replace(/\./g, '')).filter(a => a !== 'AI')
 
 function lifestyleIssues(s, from) {
   const out = []
   const beats = s.beats || []
-  // The locked line is not the writer's to thin out, and a figure in it is
-  // usually the payoff the hook is built on ("two flips a year").
-  // Beat 1 names the money. A locked line is the planner's to get right
-  // (lock_video refuses one without a figure); an unlocked one is the writer's.
-  if (!from && beats.length && !hasFigure(beats[0].line)) {
-    out.push('beat 1 names no money: open on a figure they can picture -- a monthly income, a deposit, a sale price')
+  // Beat 1 names something concrete. A locked line is the planner's to get
+  // right (lock_video refuses one without it); an unlocked one is the writer's.
+  if (!from && beats.length && !CONCRETE.test(beats[0].line)) {
+    out.push('beat 1 names nothing concrete: open on a time cost, a client, a call or a deal they can picture')
   }
   // A locked opening line is not the writer's to shorten either.
   const wordy = beats.slice(from).filter(b => String(b.line).trim().split(/\s+/).length > 18)
@@ -660,30 +693,38 @@ function lifestyleIssues(s, from) {
   }
   for (const b of beats.slice(from, 3)) {
     const found = acronymsIn(b.line)
-    if (found.length) out.push(`beat ${b.order}: "${found[0]}" in an opening beat; beats 1 to 3 are about the life, in plain words`)
+    if (found.length) out.push(`beat ${b.order}: "${found[0]}" in an opening beat; beats 1 to 3 are about their clients, in plain words`)
     if (DEFINING.test(b.line)) out.push(`beat ${b.order}: an opening beat defines something; that belongs from beat 4`)
   }
   if (DEFINING.test(s.takeaway || '')) out.push('the takeaway defines a term; it should say what this changes for them')
   if (WARNING.test(s.takeaway || '') && !GAIN.test(s.takeaway || '')) {
-    out.push('the takeaway only warns; end on what this builds -- what it pays, earns, keeps, buys or funds')
+    out.push('the takeaway only warns; end on what this builds -- the client, the call, the authority in their niche')
   }
   return out.length ? out.join('\n') : null
 }
 
-// What the brand guide rules out, as words a line can be caught using. A lint,
+// What the brand voice rules out, as words a line can be caught using. A lint,
 // not the judge of tone: it catches the plain cases cheaply and the same way
-// every time, and the prompt carries the rest.
+// every time, and the prompt carries the rest. worker/src/script-check.js
+// keeps a copy for the Edit page; keep the two in step.
 const VOICE_LINT = [
-  [/\btrilith\b/i, 'names Trilith; the channel is The Buy Box'],
-  [/\b(incredible|unbelievable|insane|crazy|mind-?blowing|game-?changer|jaw-?dropping)\b/i, 'hype, which the voice rules out'],
+  [/\btrilith\b|\bbuy box\b/i, 'names another brand; the account is AIKO'],
+  [/\b(incredible|unbelievable|insane|crazy|mind-?blowing|game-?changer|jaw-?dropping|revolutionary|supercharge\w*|skyrocket\w*|10x|hack)\b/i, 'hype, which the voice rules out'],
   [/\byou won'?t believe\b/i, 'clickbait, which the voice rules out'],
   [/\b(obviously|everyone knows|as we all know)\b/i, 'talks down to the viewer'],
-  [/\b(guarantee[ds]?|risk-?free|can'?t lose|will definitely|sure thing)\b/i, 'certain about the future'],
+  [/\b(guarantee[ds]?|risk-?free|can'?t lose|will definitely|sure thing|overnight)\b/i, 'promises results'],
+  [/\b(overwhelm\w*|drowning|burn(?:ed|t)?[ -]?out|stress(?:ed|ful)?|struggl\w*)\b/i, 'sells relief; the voice sells the advantage'],
+  [/\bfollowers?\b|\bviral\b|\bviews\b/i, 'counts followers or views; measure clients and conversations'],
   [/!/, 'exclamation mark: the voice is confident, not excited'],
 ]
+// The positioning's Never words, allowed only when saying what this is not.
+const NEVER_WORDS = /\b(branding|campaigns?|marketing services|ads|content creation|retainers?)\b/i
+const NAMING_WHAT_IT_IS_NOT = /\b(?:not|no|never|isn'?t|aren'?t|without)\b[^.?!]{0,40}\b(?:branding|campaigns?|marketing services|ads|content creation|retainers?)\b/i
 
 function lintLine(line) {
-  return VOICE_LINT.filter(([re]) => re.test(line)).map(([, why]) => why)
+  const out = VOICE_LINT.filter(([re]) => re.test(line)).map(([, why]) => why)
+  if (NEVER_WORDS.test(line) && !NAMING_WHAT_IT_IS_NOT.test(line)) out.push('agency vocabulary (branding, campaigns, ads, content creation), which the positioning rules out')
+  return out
 }
 
 // `from` skips a locked opening line: the writer cannot change it, so it is
@@ -696,7 +737,7 @@ function voiceIssues(s, from) {
   })
   const last = s.beats[s.beats.length - 1]
   if (!/\bfollow\b/i.test(last ? last.line : '')) {
-    out.push(`beat ${last ? last.order : '?'}: the last beat has to ask the viewer to follow The Buy Box`)
+    out.push(`beat ${last ? last.order : '?'}: the last beat has to ask the viewer to follow AIKO`)
   }
   return out.length ? out.join('\n') : null
 }
@@ -742,7 +783,7 @@ if (stillFlagged) {
 }
 cleanEmphasis(script)
 const emphasisWords = [...new Set(script.beats.flatMap(b => b.emphasis))]
-log(`Takeaway: "${script.takeaway}" | the listener learned: "${review.whatILearned}" | it gets them: "${review.whatItGetsMe || '(nothing they could name)'}"`)
+log(`Takeaway: "${script.takeaway}" | the listener learned: "${review.whatILearned}" | it gets them: "${review.whatItGetsMe || '(nothing they could name)'}"${review.feltLikeAPitch ? ' | it felt like an ad' : ''}`)
 log(`Hook: [${script.hookCategory}] "${script.filledHook}" | caption emphasis: ${emphasisWords.join(', ') || '(none)'}`)
 
 function lockOpeningLine(s, hook) {
@@ -797,8 +838,8 @@ HARD RULES (a plan that breaks these is rejected and you'll be asked again):
 4. At least one beat sets its turn in italic, and no beat has more than one italic phrase.
 5. One entry per beat, in order.
 
-The viewer may be brand new to real estate investing. Where a beat explains a term, its idea puts the term and
-its plain meaning on screen together, and every number shown gets a plain label.
+The viewer is an expert founder who has never done marketing. Where a beat explains a term, its idea puts the
+term and its plain meaning on screen together, and every number shown gets a plain label.
 
 Beats (with the words the captions will turn Tangerine):
 ${script.beats.map(b => `${b.order}. (${b.estSeconds}s) ${b.line}${b.emphasis.length ? `  [emphasis: ${b.emphasis.join(', ')}]` : ''}`).join('\n')}
@@ -933,9 +974,9 @@ Overflow safety: Instrument Serif runs about 0.44 x fontSize per character, so c
 must fit SAFE_W (820px) or the element's own width. Wrap it (a maxWidth with normal wrapping) or size it down;
 never let text run off-frame.
 
-Plain labels: the viewer may be brand new to real estate investing. Every number or term on screen carries a short
-everyday label that matches what the narration calls it (e.g. "Rent: $4,500 a month"), never a bare acronym and
-never a label the narration does not use.
+Plain labels: the viewer is an expert founder who has never done marketing. Every number or term on screen carries
+a short everyday label that matches what the narration calls it (e.g. "Your time: 20 minutes a month"), never a
+bare acronym and never a label the narration does not use.
 
 Transitions: TransitionSeries with slide() and wipe() only, each SWIPE long (the voiceover timing assumes that
 overlap), directions varied, no two identical back to back.

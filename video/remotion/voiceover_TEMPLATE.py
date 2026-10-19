@@ -37,7 +37,7 @@ from numeric_tts import has_pronunciation, spoken_text
 
 load_dotenv(Path(__file__).parent.parent / ".env")
 
-VOICE_ID = "56bWURjYFHyYyVf490Dp"  # the channel's narrator
+VOICE_ID = "SET-AIKO-VOICE-ID"  # AIKO's narrator; keep in step with pipeline_workflow.mjs
 MODEL_ID = "eleven_multilingual_v2"
 SWIPE = 0.35  # must match SWIPE in the video's .tsx
 FPS = 30

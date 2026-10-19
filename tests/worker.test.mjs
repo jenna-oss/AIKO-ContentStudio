@@ -1067,5 +1067,13 @@ check('follower counts are refused',
 check('a topic is not an opening line',
   hookProblems('How to use AI for marketing.').some((p) => /nothing concrete/.test(p)), '');
 
+/* The same voice rules on a line a reviewer rewrites. */
+const { lintLine } = await import(pathToFileURL(join(here, '..', 'worker', 'src', 'script-check.js')).href);
+check('a narration line in the AIKO voice passes the lint',
+  lintLine('You ask what to post this week. It answers from your industry news.').length === 0, '');
+check('the lint catches relief, hype and agency words',
+  lintLine('Overwhelmed by content creation? This revolutionary tool fixes it.').length === 3,
+  JSON.stringify(lintLine('Overwhelmed by content creation? This revolutionary tool fixes it.')));
+
 console.log(failures ? `\n${failures} FAILED` : '\nall passed');
 process.exit(failures ? 1 : 0);

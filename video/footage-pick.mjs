@@ -125,18 +125,18 @@ const PICK_TOOL = {
 
 function prompt(lines, parts) {
   return `Below is everything said in one long take to camera, one sentence per line, numbered, with how
-long each lasts. It is a real estate investor talking about lending and deals, for The Buy Box
-(@thebuyboxre), a channel for people who want to own property.
+long each lasts. It is a founder talking about their own field, filmed for their account through AIKO Content
+Studio. Their viewers are the clients they want: people who research quietly for months before they call.
 
 Your job is to find the passages worth cutting out as short videos. A short is watched or skipped on its
 first sentence, so a passage only counts if the sentence it OPENS on works as a hook on its own.
 
-What that channel's hook sounds like — sharp, declarative, a little confrontational, and specific:
-  Yes: "This deal made four thousand dollars. It took eleven months."
-  Yes: "185 purchase, 60 rehab, comps at 340."
-  No:  "You won't believe what happened with this flip."
-  No:  "So anyway, as I was saying about points..."
-  No:  "Obviously you'll want to weigh points against rate."
+What a good hook sounds like — a short, specific statement, then the turn:
+  Yes: "Most owners price their business off one number. The buyer is looking at three."
+  Yes: "An earnout is the part of the price you only get if you stay."
+  No:  "You won't believe what happened with this deal."
+  No:  "So anyway, as I was saying about multiples..."
+  No:  "Obviously you'll want to think about your valuation."
 
 A good opening sentence names something countable, or states a position plainly enough that someone would
 stay to hear why. A bad one depends on what came before it, is hype, talks down, or is certain about the
@@ -144,9 +144,9 @@ future.
 
 It must also SAY something rather than promise something. A sentence that only announces that a point is
 coming is not a hook, however confident it sounds:
-  No:  "The mistake that costs investors is this."
+  No:  "The mistake that costs sellers is this."
   No:  "Here's the thing nobody tells you."
-  Yes: "Most investors price a bridge loan off the Fed, and the Fed has nothing to do with it."
+  Yes: "Most sellers think the multiple is the price, and the working capital peg can move it by a year's profit."
 If you cannot tell what the claim is from the opening sentence alone, it is not an opening sentence.
 
 Each clip also has to stand on its own: a whole thought, beginning to end, not a fragment of an argument

@@ -65,8 +65,9 @@ function writePrompt(brief) {
     brief.evidence && `What we know: ${brief.evidence}`,
   ].filter(Boolean).join('\n');
 
-  return `Write the script for one short video for The Buy Box (@thebuyboxre), a channel about investing in
-real estate. One person, talking straight to camera, no narration and no b-roll: the words are all there is.
+  return `Write the script for one short video for AIKO Group (@aikogroup.ai). The videos advertise AIKO Content
+Studio, a self-serve tool, to founders of expertise-led, high-ticket businesses (M&A advisors, CRE brokers and
+the like). One person, talking straight to camera, no narration and no b-roll: the words are all there is.
 
 ${bits}
 
@@ -74,26 +75,33 @@ ${(brief.opening_line || brief.hook)
     ? `The first line is already decided and you must use it exactly as it is, as line 1:
 
 "${brief.opening_line || brief.hook}"`
-    : 'Write the first line yourself. It is the one people decide to stay on, so make it a short, concrete opener that names the money.'}
+    : 'Write the first line yourself. It is the one people decide to stay on, so make it a short statement, then the turn, naming something concrete: a time cost, a client, a call.'}
 
-HOW THIS CHANNEL TALKS
+HOW AIKO TALKS
 
-The channel is about what owning property does to someone's life — the income that arrives whether or not
-they worked that month, the job they could leave, the house their family lives in. Every video leads with
-that and explains the mechanics only as far as needed to make the life believable. It is never a lesson.
+The founder watching already knows their field. Their buyers research in private for months, and the person
+who taught them in public is the one who gets the call. Every video leads with that -- the client they want,
+the call that comes to them first -- and shows how it gets done on minutes a month. It is never a lecture and
+never a sales pitch.
 
-- Name the money in the first line, every time. A figure, a rent, a monthly number: something countable.
-- Lead with the life the money buys, then how it was done. Never the other way round.
-- Every idea has to support the same thing: that buying property is how the money grows.
-- Say it the way you would to a friend who has never bought a property. No acronym, no term of art, and no
-  figure goes by without plain words next to it, in the same breath.
-- Short lines. Eight to fourteen words is the shape. Never more than eighteen — at twenty-two a line is read
+- Name something concrete in the first line: a time cost, a stretch of time, a client, a call, a deal.
+- Lead with the client and the founder's place in their niche, then how it is done. Never the other way round.
+- Every idea supports the same thing: showing up and teaching in public is how an expertise business wins
+  clients, and a system like this is how a founder with no time does it.
+- Say only these things about the tool: it plans a week or a month of videos in one conversation, from the
+  founder's industry news; each video comes back finished, voiced, captioned and in their brand; changes are
+  typed in plain words; nothing is made before the plan is locked or posted before it is approved; it posts on
+  schedule to TikTok, Instagram, YouTube and Facebook. Never invent a feature, a price, a result or a customer.
+- Say it the way you would to a sharp client who has never done marketing. No marketing or AI jargon (GTM,
+  funnel, algorithm, engagement, prompt) unless it is explained in the same breath.
+- Short lines. Eight to fourteen words is the shape. Never more than eighteen -- at twenty-two a line is read
   at twice the pace of a short one, and the whole thing sounds uneven.
-- Confident, not excited. No exclamation marks, no hype words, nothing certain about the future, no
-  guarantees. Never say Trilith; the channel is The Buy Box.
+- Calm and precise, not excited. Sell the advantage, never relief: no "overwhelmed", no "struggling". No
+  exclamation marks, no hype words, no promises about results, no follower or view counts. Never say
+  branding, campaigns, marketing services, ads, content creation or retainer, except to say what this is not.
 - ${TARGET_WORDS[0]} to ${TARGET_WORDS[1]} words in total, across at most ${MAX_SCRIPT_LINES} lines. That is
   about a minute of talking.
-- The last line asks the viewer to follow. Say follow, in those words.
+- The last line asks the viewer to follow AIKO. Say follow, in those words.
 
 TO CAMERA, NOT OVER PICTURES
 
