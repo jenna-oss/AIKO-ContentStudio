@@ -10,7 +10,7 @@
 
   /* From the Clerk dashboard, API keys. pk_test_... while trying it out,
      pk_live_... once the production instance is set up. */
-  var PUBLISHABLE_KEY = 'pk_test_REPLACE_WITH_AIKO_CLERK_KEY';
+  var PUBLISHABLE_KEY = 'pk_test_d2FudGVkLW1vdGgtNDU1Mi5jbGVyay5hY2NvdW50cy5kZXYk';
 
   /* The key is pk_<env>_<base64 of "your-frontend-api-host$">, and Clerk's
      script is served from that host. */
