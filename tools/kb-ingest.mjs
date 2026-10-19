@@ -31,7 +31,7 @@ if (!SUPABASE_URL || !SERVICE_KEY) {
   process.exit(0);
 }
 
-const brandSlug = process.env.KB_BRAND || 'trilith';
+const brandSlug = process.env.KB_BRAND || 'aiko';
 
 const counts = { new: 0, changed: 0, unchanged: 0, failed: 0 };
 const problems = [];

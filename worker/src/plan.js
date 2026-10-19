@@ -379,7 +379,7 @@ export async function rememberFile(env, texts, input, sessionId) {
   try {
     created = await rpc(env, 'kb_upload_document', {
       payload: {
-        brand_slug: 'trilith',
+        brand_slug: 'aiko',
         document_type: documentType,
         title: str(input.title, 300) || name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' '),
         source_key: name,

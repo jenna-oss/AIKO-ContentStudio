@@ -15,7 +15,7 @@ import { rpc, clamp } from './db.js';
 
 const VOYAGE_URL = 'https://api.voyageai.com/v1/embeddings';
 const VOYAGE_TIMEOUT_MS = 8000;
-const BRAND = 'trilith';
+const BRAND = 'aiko';
 
 /* --- query embedding ----------------------------------------------------- */
 

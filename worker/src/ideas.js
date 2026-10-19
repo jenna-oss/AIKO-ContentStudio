@@ -1069,7 +1069,7 @@ export async function handleIdeas(request, env, headers, ctx) {
             await rpc(env, 'kb_plan_save', {
               p_session_id: sessionId,
               payload: {
-                brand_slug: 'trilith',
+                brand_slug: 'aiko',
                 goal: plan.goal,
                 target_count: plan.target_count,
                 slots: plan.slots,
@@ -1081,7 +1081,7 @@ export async function handleIdeas(request, env, headers, ctx) {
 
         if (searchLog.length) {
           try {
-            const brandId = await rpc(env, 'kb_brand_id', { p_slug: 'trilith' });
+            const brandId = await rpc(env, 'kb_brand_id', { p_slug: 'aiko' });
             await rpc(env, 'kb_log_retrievals', {
               payload: searchLog.map((e) => ({ ...e, brand_id: brandId })),
             });

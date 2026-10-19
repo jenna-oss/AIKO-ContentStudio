@@ -22,8 +22,8 @@
   var el = A.el;
   var FPS = 30;
   var MAX_NOTES = 8;
-  var DRAFT_KEY = 'trilith-edit-drafts';
-  var SCRIPT_KEY = 'trilith-script-drafts';
+  var DRAFT_KEY = 'aiko-edit-drafts';
+  var SCRIPT_KEY = 'aiko-script-drafts';
   var CLIP_KEY = 'aiko-clip-drafts';
 
   function load(key) { try { return JSON.parse(localStorage.getItem(key) || '{}') || {}; } catch (e) { return {}; } }

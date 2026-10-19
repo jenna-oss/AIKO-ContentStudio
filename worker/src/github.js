@@ -19,7 +19,7 @@ export async function dispatchWorkflow(env, workflow, inputs, what) {
         accept: 'application/vnd.github+json',
         'x-github-api-version': '2022-11-28',
         /* GitHub rejects API calls without one. */
-        'user-agent': 'trilith-ask-worker',
+        'user-agent': 'aiko-studio-worker',
         'content-type': 'application/json',
       },
       body: JSON.stringify({ ref: 'main', inputs }),

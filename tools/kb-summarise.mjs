@@ -158,7 +158,7 @@ for (const doc of docs) {
     try {
       await rpc('kb_save_insight', {
         payload: {
-          brand_slug: 'trilith',
+          brand_slug: 'aiko',
           topic: ins.topic || (parsed.topics || [])[0] || doc.title,
           insight: ins.insight,
           supporting_chunk_ids: cited,

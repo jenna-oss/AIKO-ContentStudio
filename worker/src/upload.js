@@ -110,7 +110,7 @@ export async function ingestText(env, ctx, {
 }) {
   const created = await rpc(env, 'kb_upload_document', {
     payload: {
-      brand_slug: 'trilith',
+      brand_slug: 'aiko',
       document_type: documentType,
       title,
       source,
@@ -185,7 +185,7 @@ export async function handleUpload(request, env, headers, ctx) {
   try {
     created = await rpc(env, 'kb_upload_document', {
       payload: {
-        brand_slug: 'trilith',
+        brand_slug: 'aiko',
         document_type: documentType,
         title: body.title || name.replace(/\.[^.]+$/, '').replace(/[-_]+/g, ' ').trim(),
         source: body.source || null,

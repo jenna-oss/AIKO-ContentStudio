@@ -35,7 +35,7 @@ const library = await rpc('kb_video_library', { p_limit: 200 });
 const rows = library
   .filter((v) => v.review_status !== 'rejected' && v.topic)
   .map((v) => ({
-    brand_slug: 'trilith',
+    brand_slug: 'aiko',
     source_key: v.kind === 'clip' ? `clip:${v.id}` : `video:${v.session_id}:${v.slot}`,
     title: v.topic,
     topic: v.topic,

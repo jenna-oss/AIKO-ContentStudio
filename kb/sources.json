@@ -3,8 +3,10 @@
     "url": "https://www.example.com/replace-me",
     "document_type": "research",
     "source": "Publisher name",
-    "topics": ["mortgage rates"],
-    "research_type": "market_report",
+    "topics": [
+      "LinkedIn for B2B services"
+    ],
+    "research_type": "industry_report",
     "disabled": true
   }
 ]

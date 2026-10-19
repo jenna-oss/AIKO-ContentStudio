@@ -44,7 +44,14 @@ if (!URL.canParse(`${URL_BASE}/rest/v1/`)) {
 
 const redact = (s) => String(s).split(KEY).join('[REDACTED]');
 
-const corpus = JSON.parse(await readFile(join(ROOT, 'data', 'content.json'), 'utf8'));
+let corpus;
+try {
+  corpus = JSON.parse(await readFile(join(ROOT, 'data', 'content.json'), 'utf8'));
+} catch {
+  /* pull-content writes nothing while there is no site and no content/own/. */
+  console.log('No data/content.json — nothing to push.');
+  process.exit(0);
+}
 const docs = corpus.docs || [];
 
 if (!docs.length) {

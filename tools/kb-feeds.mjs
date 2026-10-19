@@ -20,7 +20,7 @@ import { join } from 'node:path';
 
 import { decode, htmlToText, isoOrNull, fetchArticle } from './kb-web.mjs';
 
-const UA = 'Mozilla/5.0 (compatible; TrilithKnowledgeBot/1.0; +https://trilithfunding.com)';
+const UA = 'Mozilla/5.0 (compatible; AikoKnowledgeBot/1.0)';
 const TIMEOUT_MS = 20000;
 const DEFAULT_MAX_ITEMS = 5;
 const DEFAULT_MAX_AGE_DAYS = 30;

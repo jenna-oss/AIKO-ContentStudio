@@ -729,7 +729,7 @@ jobs:
           }
           record_failed() {
             record "$(jq -n --arg s "$SESSION_ID" --argjson n "$SLOT" --arg t "$TOPIC" --arg r "$RUN_URL" --arg w "$1" \
-              '{payload:{brand_slug:"trilith",session_id:$s,slot:$n,topic:$t,status:"failed",error:$w,run_url:$r}}')" > /dev/null
+              '{payload:{brand_slug:"aiko",session_id:$s,slot:$n,topic:$t,status:"failed",error:$w,run_url:$r}}')" > /dev/null
             finish_edit failed "$1"
             echo "### Slot $SLOT — not stored: $1" >> "$GITHUB_STEP_SUMMARY"
           }
@@ -843,7 +843,7 @@ jobs:
             --arg p "$PATH_IN_BUCKET" --argjson b "$BYTES" --arg d "${DUR:-0}" --arg r "$RUN_URL" \
             --arg f "$(basename "$MP4")" --arg m "${OUT_mean_db:-}" --argjson photos "$PHOTOS_JSON" \
             --arg src "$SOURCE_PATH" --arg ei "${EDIT_ID:-}" --arg eo "${EDIT_OF:-}" --argjson script "$SCRIPT_JSON" \
-            '{payload:{brand_slug:"trilith",session_id:$s,slot:$n,topic:$t,
+            '{payload:{brand_slug:"aiko",session_id:$s,slot:$n,topic:$t,
                        storage_path:$p,bytes:$b,duration_seconds:($d|tonumber),
                        status:"rendered",run_url:$r,
                        metadata:({source_file:$f,mean_volume_db:$m}

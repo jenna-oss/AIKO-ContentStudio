@@ -1,17 +1,16 @@
 /* ---------------------------------------------------------------------------
  * Build the hook library from the Spyglass hook patterns (spec section 20).
  *
- * adspy.hook_patterns holds 833 creative structures from seven advertisers
- * OUTSIDE the lending category — NerdWallet, Chime, Zillow, LendingTree, Rocket
- * Money, Hormozi, Kiyosaki. Spyglass has no insight coverage for investor
- * lenders at all, so none of it is competitor intelligence, and the planner is
- * told so in two places: the system prompt, and the origin field on every row
- * this writes.
+ * adspy.hook_patterns holds creative structures from founder, creative and
+ * agency voices on social (tools/pull-spyglass.mjs lists them). None of them
+ * sells an AI content tool, so none of it is competitor intelligence, and the
+ * planner is told so in two places: the system prompt, and the origin field on
+ * every row this writes.
  *
  * What those rows are is labels — "Personal discovery narrative (I [found] a
  * [sign])". What section 20 asks for is a template and an example. Turning one
- * into the other is a rewrite into the lending context, which is why this needs
- * a model and is a separate, occasional job rather than part of the daily run.
+ * into the other is a rewrite into AIKO's context, which is why this needs a
+ * model and is a separate, occasional job rather than part of the daily run.
  *
  * Needs SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY and ANTHROPIC_API_KEY.
  * ------------------------------------------------------------------------ */
@@ -35,29 +34,33 @@ const LIMIT = Number(process.env.KB_HOOK_LIMIT || 40);
  * lever; the ceiling below is the safety net, not the fix. */
 const BATCH = 6;
 
-const SYSTEM = `You adapt advertising hook patterns into reusable templates for a private real estate lender that finances property investors — fix-and-flip, bridge, DSCR, ground-up, BRRRR, multifamily. The audience is investors and the brokers who serve them.
+const SYSTEM = `You adapt hook patterns into reusable opening-line templates for AIKO Group, whose short faceless videos advertise AIKO Content Studio: a self-serve tool that turns one planning conversation into a week of finished, on-brand educational videos. The audience is owner-operators of expertise-led, high-ticket businesses — M&A advisors, business brokers, CRE brokers, CPAs — who know social media decides who gets the call and have no time for it.
 
-You are given patterns observed on brands OUTSIDE lending: consumer finance, real estate marketplaces, business education. You are taking the FORM, not the content. Never write a template that claims anything about a competitor.
+You are given patterns observed on founder, creative and agency accounts. You are taking the FORM, not the content. Never write a template that names or claims anything about another company.
 
 For each pattern return:
 
 category — a short snake_case family name. Reuse these where they fit:
-           myth_busting, cost_of_waiting, contrarian, personal_discovery,
+           myth_busting, cost_of_invisibility, contrarian, personal_discovery,
            speed_or_ease, hidden_cost, qualification, comparison,
            objection_handling, proof_or_receipts, warning, question_open
 template — the reusable shape, with {placeholders} for the parts that change.
            It must read as a spoken opening line for a 30-60 second vertical
-           video, not as a headline or a banner.
-example  — the template filled in for this lender, on a real subject like DSCR
-           qualification, appraisal gaps, rehab draws, or the cost of waiting
-           for rates. One sentence, natural spoken English.
-topics   — up to 3 lending subjects this shape suits.
+           video, not as a headline or a banner: short and declarative, then
+           the turn.
+example  — the template filled in for AIKO, on a real subject like buyers
+           researching an advisor for a year before calling, the referral that
+           arrives already convinced, or a week of videos from one conversation.
+           One sentence, natural spoken English. Name something concrete — a
+           time cost, a client, a call. No hype, no exclamation marks, no
+           follower or view counts, no promise of results.
+topics   — up to 3 subjects this shape suits (visibility, trust, time, AI, referrals, niche authority).
 
 Drop a pattern rather than force it. If a pattern is specific to the source
-brand's product — a checking account bonus, a subscription canceller, an
-astrology skit — return "skip": true for it and nothing else. A padded library
-is worse than a short one: every row here is something a planner may put in
-front of a lender's audience.
+account's own product or life — a course launch, a giveaway, a gym routine —
+return "skip": true for it and nothing else. A padded library is worse than a
+short one: every row here is something a planner may put in front of AIKO's
+audience.
 
 Return bare JSON, no prose, no code fence:
 {"hooks":[{"pattern_ref":"...","skip":false,"category":"...","template":"...","example":"...","topics":["..."]}]}`;
@@ -109,7 +112,7 @@ for (let i = 0; i < patterns.length; i += BATCH) {
     if (h.skip || !h.template || !h.category) { skipped += 1; continue; }
 
     rows.push({
-      brand_slug: 'trilith',
+      brand_slug: 'aiko',
       category: String(h.category).toLowerCase().replace(/[^a-z0-9_]+/g, '_'),
       template: h.template,
       example: h.example || null,

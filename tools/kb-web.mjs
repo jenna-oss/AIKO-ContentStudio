@@ -9,7 +9,7 @@
  * document, not two near-copies.
  * ------------------------------------------------------------------------ */
 
-const UA = 'Mozilla/5.0 (compatible; TrilithKnowledgeBot/1.0; +https://trilithfunding.com)';
+const UA = 'Mozilla/5.0 (compatible; AikoKnowledgeBot/1.0)';
 
 /* --- HTML to text -------------------------------------------------------- */
 

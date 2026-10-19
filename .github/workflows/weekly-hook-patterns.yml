@@ -4,7 +4,8 @@ name: Weekly hook patterns
 #
 # Weekly, not daily, and separate from the ad pull: Spyglass bills credits per
 # row returned, and creative structure moves far more slowly than ad inventory.
-# Seven brands x two insight types is fourteen calls a week.
+# Five brands x two insight types is ten calls a week, once their ids are set
+# in tools/pull-spyglass.mjs.
 #
 # No browser here, so this job is small and fast — the ad pull's Chromium
 # install is the slow part and is not needed to call an API.

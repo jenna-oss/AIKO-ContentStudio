@@ -1,8 +1,14 @@
 /* ---------------------------------------------------------------------------
- * Harvest Trilith's own written content — blog posts, funded-deal writeups,
- * product pages, FAQ — into data/content.json.
+ * Harvest AIKO's own written content into data/content.json, from one of two
+ * places:
  *
- * The site is server-rendered, so a plain fetch is enough; no browser needed.
+ * 1. Markdown files in content/own/ (the default while AIKO has no site). The
+ *    positioning and the product copy live there. They are gitignored, like
+ *    kb/files/: this repository is public and the positioning is not.
+ * 2. A site's sitemap, once there is one: set OWN_SITE_SITEMAP to its URL.
+ *    Files in content/own/ are still read alongside it.
+ *
+ * The site path is server-rendered pages, so a plain fetch is enough.
  * Metadata comes from the JSON-LD block where the page has one, because that is
  * the publisher's own statement of title, date and author rather than our guess
  * at which heading was the title.
@@ -11,13 +17,14 @@
  * posts, and loading it would double every retrieval result with a duplicate.
  * ------------------------------------------------------------------------ */
 
-import { writeFile, mkdir } from 'node:fs/promises';
+import { writeFile, mkdir, readdir, readFile } from 'node:fs/promises';
 import { join, dirname } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const ROOT = join(dirname(fileURLToPath(import.meta.url)), '..');
-const SITEMAP = 'https://trilithfunding.com/sitemap.xml';
-const UA = 'Mozilla/5.0 (compatible; TrilithContentBot/1.0; +https://trilithfunding.com)';
+const SITEMAP = String(process.env.OWN_SITE_SITEMAP || '').trim();
+const OWN_DIR = join(ROOT, 'content', 'own');
+const UA = 'Mozilla/5.0 (compatible; AikoContentBot/1.0)';
 const PAUSE_MS = 400;
 
 /* Chunk sizes are tuned for retrieval, not for reading. A chunk should be big
@@ -108,10 +115,52 @@ function fromJsonLd(html) {
 function classify(url) {
   const p = new URL(url).pathname;
   if (p.startsWith('/blog/')) return 'blog';
-  if (p.startsWith('/just-funded/')) return 'case-study';
-  if (p.startsWith('/products/')) return 'product';
   if (p === '/faq') return 'faq';
   return 'page';
+}
+
+/* Front matter is optional: title, kind (positioning, page, faq, blog), url
+ * and published. Without it the file name is the title and the kind is page. */
+function frontMatter(raw) {
+  const m = raw.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!m) return { meta: {}, body: raw };
+  const meta = {};
+  for (const line of m[1].split(/\r?\n/)) {
+    const kv = line.match(/^([a-z_]+):\s*(.*)$/i);
+    if (kv) meta[kv[1].toLowerCase()] = kv[2].trim();
+  }
+  return { meta, body: raw.slice(m[0].length) };
+}
+
+async function ownFiles() {
+  let names = [];
+  try { names = (await readdir(OWN_DIR)).filter((n) => /\.(md|txt)$/i.test(n)); } catch { return []; }
+  const out = [];
+  for (const name of names.sort()) {
+    const { meta, body } = frontMatter(await readFile(join(OWN_DIR, name), 'utf8'));
+    const text = body.replace(/\r\n/g, '\n').trim();
+    if (text.length < 200) { console.log(`  skipped    ${name} — only ${text.length} chars`); continue; }
+    const slug = name.replace(/\.[^.]+$/, '');
+    const pieces = chunk(text);
+    const kind = ['positioning', 'page', 'faq', 'blog'].includes(meta.kind) ? meta.kind : 'page';
+    out.push({
+      /* No site yet, so a file has no web address. The planner cites it by
+       * this id; it is replaced by the real URL once the page is published. */
+      url: meta.url || `aiko:${slug}`,
+      kind,
+      title: meta.title || slug.replace(/[-_]+/g, ' '),
+      summary: meta.summary || null,
+      author: 'AIKO Group',
+      published: meta.published || null,
+      date_source: meta.published ? 'front-matter' : null,
+      updated: null,
+      word_count: text.split(/\s+/).length,
+      body: text,
+      chunks: pieces.map((c, i) => ({ ordinal: i, heading: c.heading, text: c.text })),
+    });
+    console.log(`  ${kind.padEnd(11)} ${pieces.length.toString().padStart(2)} chunks  ${name}`);
+  }
+  return out;
 }
 
 /* Headings mark where an argument turns, so they are the right seam — but
@@ -182,6 +231,11 @@ async function get(url) {
 
 /* --- run ---------------------------------------------------------------- */
 
+const docs = await ownFiles();
+const failures = [];
+console.log(`${docs.length} document(s) from content/own/`);
+
+if (SITEMAP) {
 const sitemap = await get(SITEMAP);
 
 const entries = [...sitemap.matchAll(/<url>([\s\S]*?)<\/url>/g)].map((m) => ({
@@ -212,9 +266,6 @@ const urls = entries
 
 console.log(`${urls.length} English URLs in the sitemap`);
 if (IGNORE_LASTMOD) console.log(`Ignoring build stamp ${IGNORE_LASTMOD} on ${buildStamp[1]} pages`);
-
-const docs = [];
-const failures = [];
 
 for (const url of urls) {
   try {
@@ -262,8 +313,15 @@ for (const url of urls) {
   }
   await sleep(PAUSE_MS);
 }
+}
 
+/* No site and no files is a normal state while AIKO has neither: say so and
+ * leave the corpus as it was. A sitemap that yields nothing is a real failure. */
 if (!docs.length) {
+  if (!SITEMAP) {
+    console.log('No OWN_SITE_SITEMAP and nothing in content/own/ — no own content to harvest.');
+    process.exit(0);
+  }
   console.error('Harvested nothing. Not writing.');
   process.exit(1);
 }
@@ -272,7 +330,7 @@ await mkdir(join(ROOT, 'data'), { recursive: true });
 await writeFile(
   join(ROOT, 'data', 'content.json'),
   JSON.stringify({
-    site: 'trilithfunding.com',
+    site: SITEMAP ? new URL(SITEMAP).hostname : 'aiko-local',
     fetchedAt: new Date().toISOString(),
     docs,
     failures,

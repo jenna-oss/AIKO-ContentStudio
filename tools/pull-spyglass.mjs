@@ -29,19 +29,28 @@ const TYPES = ['HOOK', 'AD_ANGLE'];
 /* Resolved once and pinned. Re-searching by name on every run would spend
  * credits to rediscover ids that do not change, and risks silently latching
  * onto a different brand when a name is ambiguous. */
-const BRANDS = [
-  { id: '108521893501',    name: 'NerdWallet',      category: 'Finance' },
-  { id: '84763399274',     name: 'LendingTree',     category: 'Finance' },
-  { id: '246223015551168', name: 'Chime',           category: 'Finance' },
-  { id: '633318986770616', name: 'Rocket Money',    category: 'Finance' },
-  { id: '33416011787',     name: 'Robert Kiyosaki', category: 'Finance' },
-  { id: '7129388593',      name: 'Zillow',          category: 'Real Estate' },
-  { id: '116482854782233', name: 'Alex Hormozi',    category: 'Education' },
+/* AIKO's hook sources: founders building authority on social, and creative or
+ * agency voices making the case that content is how you win. Ids are filled in
+ * once resolved with Spyglass's getAccounts (the subscription was inactive when
+ * this list was chosen, 2026-10-18). A brand without an id is skipped. */
+const ALL_BRANDS = [
+  { id: null, name: 'Justin Welsh',     category: 'Founder brand' },
+  { id: null, name: 'Matt Gray',        category: 'Founder brand' },
+  { id: null, name: 'Dan Koe',          category: 'Founder brand' },
+  { id: null, name: 'Chris Do',         category: 'Creative and agency' },
+  { id: null, name: 'Gary Vaynerchuk',  category: 'Creative and agency' },
 ];
+const BRANDS = ALL_BRANDS.filter((b) => b.id);
 
 const KEY = String(process.env.SPYGLASS_API_KEY ?? '').trim();
 if (!KEY) {
   console.log('SPYGLASS_API_KEY not set — skipping the hook-pattern refresh.');
+  process.exit(0);
+}
+const unresolved = ALL_BRANDS.filter((b) => !b.id).map((b) => b.name);
+if (unresolved.length) console.log(`No Spyglass id yet, skipped: ${unresolved.join(', ')}`);
+if (!BRANDS.length) {
+  console.log('No hook sources have a Spyglass id yet — nothing to refresh.');
   process.exit(0);
 }
 

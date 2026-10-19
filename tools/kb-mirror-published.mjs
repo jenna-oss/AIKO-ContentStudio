@@ -1,8 +1,8 @@
 /* ---------------------------------------------------------------------------
- * Mirror Trilith's published website content into kb.published_content.
+ * Mirror AIKO's published content into kb.published_content.
  *
  * The content schema already holds 80 pages split into 561 passages, and it
- * answers "what has Trilith written about X" well. It cannot answer "have we
+ * answers "what has AIKO written about X" well. It cannot answer "have we
  * already made this argument", because it records no topic, angle or hook —
  * those are the fields repetition detection compares, and a web page does not
  * state them anywhere a parser could read.
@@ -10,7 +10,7 @@
  * So they are derived. Each page is read once by the model, which returns the
  * topic, the angle, and the opening hook as the page itself states them. The
  * derivation is marked in metadata as inferred, because it is: nobody at
- * Trilith wrote "angle: lower rates don't mean cheaper homes" on that post.
+ * AIKO wrote "angle: lower rates don't mean cheaper homes" on that post.
  *
  * The two tables are not redundant. This one is deliberately shallow — one row
  * per piece, no body — because repetition detection compares arguments, not
@@ -110,7 +110,7 @@ for (let i = 0; i < pages.length; i += BATCH) {
         : null;
 
     rows.push({
-      brand_slug: 'trilith',
+      brand_slug: 'aiko',
       source_key: page.url,
       title: page.title,
       topic: got.topic,

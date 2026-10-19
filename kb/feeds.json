@@ -1,114 +1,177 @@
 [
   {
-    "name": "Federal Reserve monetary policy",
-    "feed": "https://www.federalreserve.gov/feeds/press_monetary.xml",
-    "document_type": "report",
-    "source": "Federal Reserve",
+    "name": "Seth's Blog",
+    "feed": "https://seths.blog/feed/",
+    "document_type": "article",
+    "source": "Seth Godin",
     "topics": [
-      "interest rates",
-      "Fed policy"
+      "marketing",
+      "trust",
+      "positioning"
     ],
-    "max_items": 4,
-    "max_age_days": 45
+    "max_items": 6,
+    "max_age_days": 21
   },
   {
-    "name": "Calculated Risk",
-    "feed": "https://calculatedrisk.substack.com/feed",
+    "name": "SaaStr",
+    "feed": "https://www.saastr.com/feed/",
     "document_type": "article",
-    "source": "Calculated Risk",
+    "source": "SaaStr",
     "topics": [
-      "housing market",
-      "mortgage rates",
-      "economic data"
+      "go-to-market",
+      "founders",
+      "B2B sales"
     ],
-    "max_items": 8,
-    "max_age_days": 14,
+    "max_items": 5,
+    "max_age_days": 21
+  },
+  {
+    "name": "Sahil Bloom",
+    "feed": "https://www.sahilbloom.com/newsletter/rss.xml",
+    "document_type": "article",
+    "source": "Sahil Bloom",
+    "topics": [
+      "founders",
+      "personal brand",
+      "leverage"
+    ],
+    "max_items": 4,
+    "max_age_days": 30
+  },
+  {
+    "name": "Lenny's Newsletter",
+    "feed": "https://www.lennysnewsletter.com/feed",
+    "document_type": "article",
+    "source": "Lenny's Newsletter",
+    "topics": [
+      "go-to-market",
+      "growth",
+      "founders"
+    ],
+    "max_items": 4,
+    "max_age_days": 21,
     "disabled": true,
     "note": "Substack returns 403 to GitHub Actions runners (works from a home connection). Re-enable if that changes."
   },
   {
-    "name": "Redfin News",
-    "feed": "https://www.redfin.com/news/feed/",
-    "document_type": "research",
-    "source": "Redfin",
-    "topics": [
-      "home prices",
-      "rents",
-      "housing market"
-    ]
-  },
-  {
-    "name": "Realtor.com Research",
-    "feed": "https://www.realtor.com/research/feed/",
-    "document_type": "research",
-    "source": "Realtor.com",
-    "topics": [
-      "home prices",
-      "inventory",
-      "housing market"
-    ]
-  },
-  {
-    "name": "ATTOM",
-    "feed": "https://www.attomdata.com/feed/",
-    "document_type": "research",
-    "source": "ATTOM",
-    "topics": [
-      "home flipping",
-      "foreclosures",
-      "investor activity"
-    ]
-  },
-  {
-    "name": "BiggerPockets",
-    "feed": "https://www.biggerpockets.com/blog/feed",
+    "name": "ACG Insights",
+    "feed": "https://middlemarketgrowth.org/feed/",
     "document_type": "article",
-    "source": "BiggerPockets",
+    "source": "ACG",
     "topics": [
-      "real estate investing",
-      "rental properties"
-    ]
+      "M&A",
+      "middle market",
+      "exits"
+    ],
+    "max_items": 5,
+    "max_age_days": 21
   },
   {
-    "name": "Stessa",
-    "feed": "https://www.stessa.com/blog/feed/",
+    "name": "IBBA",
+    "feed": "https://www.ibba.org/feed/",
     "document_type": "article",
-    "source": "Stessa",
+    "source": "International Business Brokers Association",
     "topics": [
-      "rental property management",
-      "cash flow"
-    ]
+      "business brokers",
+      "selling a business"
+    ],
+    "max_items": 4,
+    "max_age_days": 60
   },
   {
-    "name": "HousingWire",
-    "feed": "https://www.housingwire.com/feed/",
+    "name": "Peak Business Valuation",
+    "feed": "https://peakbusinessvaluation.com/feed/",
     "document_type": "article",
-    "source": "HousingWire",
+    "source": "Peak Business Valuation",
     "topics": [
-      "mortgage industry",
-      "housing market"
-    ]
+      "business valuation",
+      "selling a business"
+    ],
+    "max_items": 4,
+    "max_age_days": 30
   },
   {
-    "name": "National Mortgage News",
-    "feed": "https://www.nationalmortgagenews.com/feed?rss=true",
+    "name": "Commercial Observer",
+    "feed": "https://commercialobserver.com/feed/",
     "document_type": "article",
-    "source": "National Mortgage News",
+    "source": "Commercial Observer",
     "topics": [
-      "mortgage industry",
-      "DSCR loans",
-      "lending"
-    ]
+      "commercial real estate",
+      "CRE brokers"
+    ],
+    "max_items": 5,
+    "max_age_days": 14
   },
   {
-    "name": "Scotsman Guide",
-    "feed": "https://www.scotsmanguide.com/rss/",
+    "name": "Connect CRE",
+    "feed": "https://www.connectcre.com/feed/",
     "document_type": "article",
-    "source": "Scotsman Guide",
+    "source": "Connect CRE",
     "topics": [
-      "mortgage industry",
-      "commercial lending",
-      "non-QM"
-    ]
+      "commercial real estate",
+      "CRE market"
+    ],
+    "max_items": 4,
+    "max_age_days": 14
+  },
+  {
+    "name": "Bisnow National",
+    "feed": "https://www.bisnow.com/rss/national",
+    "document_type": "article",
+    "source": "Bisnow",
+    "topics": [
+      "commercial real estate",
+      "CRE deals"
+    ],
+    "max_items": 4,
+    "max_age_days": 14
+  },
+  {
+    "name": "The Verge — AI",
+    "feed": "https://www.theverge.com/rss/ai-artificial-intelligence/index.xml",
+    "document_type": "article",
+    "source": "The Verge",
+    "topics": [
+      "AI tools",
+      "AI video"
+    ],
+    "max_items": 5,
+    "max_age_days": 14
+  },
+  {
+    "name": "MIT Technology Review — AI",
+    "feed": "https://www.technologyreview.com/topic/artificial-intelligence/feed",
+    "document_type": "article",
+    "source": "MIT Technology Review",
+    "topics": [
+      "AI",
+      "AI and work"
+    ],
+    "max_items": 4,
+    "max_age_days": 21
+  },
+  {
+    "name": "OpenAI News",
+    "feed": "https://openai.com/news/rss.xml",
+    "document_type": "article",
+    "source": "OpenAI",
+    "topics": [
+      "AI models",
+      "AI tools"
+    ],
+    "max_items": 3,
+    "max_age_days": 21
+  },
+  {
+    "name": "Google AI",
+    "feed": "https://blog.google/technology/ai/rss/",
+    "document_type": "article",
+    "source": "Google",
+    "topics": [
+      "AI models",
+      "AI tools"
+    ],
+    "max_items": 3,
+    "max_age_days": 21
   }
 ]

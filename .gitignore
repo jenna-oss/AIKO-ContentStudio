@@ -40,3 +40,10 @@ video/remotion/.run/
 # degrades to `npm install` and a transitive dependency can change under a
 # pipeline nobody is watching.
 !video/remotion/package-lock.json
+
+# AIKO's own content. The positioning is internal and this repo is public, so
+# the source files and the corpus built from them stay on this machine; CI
+# reads a published site through OWN_SITE_SITEMAP instead.
+content/own/*
+!content/own/.gitkeep
+data/content.json

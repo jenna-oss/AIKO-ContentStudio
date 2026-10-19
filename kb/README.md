@@ -30,13 +30,13 @@ Optional, and only worth writing when the filename does not say enough:
 
 ```markdown
 ---
-title: Fannie Mae September housing outlook
+title: How B2B buyers research advisors before the first call
 type: research
-source: Fannie Mae
+source: Publisher name
 published: 2026-09-05
-url: https://www.fanniemae.com/...
-topics: mortgage rates, housing inventory
-research_type: market_report
+url: https://www.example.com/...
+topics: buyer research, trust, LinkedIn
+research_type: industry_report
 ---
 
 The body starts here.
@@ -54,7 +54,7 @@ presenting one as the other would corrupt every recency score in the system.
   {
     "url": "https://www.youtube.com/watch?v=...",
     "document_type": "transcript",
-    "topics": ["DSCR loans"]
+    "topics": ["founder-led go-to-market"]
   },
   {
     "url": "https://www.example.com/market-report",
@@ -83,12 +83,12 @@ come back unchanged and cost nothing to embed.
 
 ```json
 {
-  "name": "Calculated Risk",
-  "feed": "https://calculatedrisk.substack.com/feed",
+  "name": "Commercial Observer",
+  "feed": "https://commercialobserver.com/feed/",
   "document_type": "article",
-  "source": "Calculated Risk",
-  "topics": ["housing market"],
-  "max_items": 8,
+  "source": "Commercial Observer",
+  "topics": ["commercial real estate"],
+  "max_items": 5,
   "max_age_days": 14
 }
 ```
@@ -98,6 +98,16 @@ feed carrying 250 posts costs the same as one carrying ten. Each post is read
 from its own page; when that page renders in JavaScript or turns bots away, the
 full text in the feed is used instead. A Substack newsletter's feed is its
 address plus `/feed`. Set `"disabled": true` to stop following one.
+
+## 2c. AIKO's own content
+
+Separate from the knowledge base: what the planner searches as "AIKO content"
+to keep claims about the tool true. Put Markdown in `content/own/` (front matter
+`title`, `kind` — positioning, page, faq or blog — and optionally `url` and
+`published`), then `node tools/pull-content.mjs && node tools/push-content.mjs`.
+The folder is gitignored because the positioning is internal and this repository
+is public. Once AIKO has a site, set `OWN_SITE_SITEMAP` and its pages are read
+alongside the files.
 
 ## 3. Upload from the Plan page
 
