@@ -1,5 +1,6 @@
-// Burned-in captions in the brand guide's style (page 5): white Inter in a
-// tight black box, with the line's key words in Site Orange. They are timed
+// Burned-in captions in the AIKO style: Paper Public Sans on a tight Ink
+// plate, with the line's key words in Tangerine (the one ground Tangerine type
+// is legal on). They are timed
 // word by word to the narration: the voiceover step writes
 // public/<slug>/captions.json from ElevenLabs' character timestamps.
 //
@@ -7,7 +8,7 @@
 // renders nothing instead of failing.
 import React, { useEffect, useMemo, useState } from "react";
 import { AbsoluteFill, continueRender, delayRender, interpolate, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { BLACK, BODY, CAPTION_SIZE, ORANGE, SAFE, SAFE_W, WHITE } from "./brand";
+import { CAPTION_SIZE, INK, PAPER, SAFE, SAFE_W, TANGERINE, TEXT } from "./brand";
 
 type Word = { text: string; start: number; end: number; beat: number };
 type Page = { words: Word[]; start: number; until: number };
@@ -84,19 +85,19 @@ export const Captions: React.FC<{ slug: string; emphasis?: string[] }> = ({ slug
       >
         <div
           style={{
-            backgroundColor: BLACK,
+            backgroundColor: INK,
             padding: "10px 20px",
-            fontFamily: BODY,
-            fontWeight: 700,
+            fontFamily: TEXT,
+            fontWeight: 600,
             fontSize: CAPTION_SIZE,
-            lineHeight: 1.2,
+            lineHeight: 1.24,
             textAlign: "center",
           }}
         >
           {page.words.map((w, i) => (
             <span
               key={i}
-              style={{ color: hot.has(key(w.text)) ? ORANGE : WHITE, opacity: t >= w.start - 0.02 ? 1 : 0 }}
+              style={{ color: hot.has(key(w.text)) ? TANGERINE : PAPER, opacity: t >= w.start - 0.02 ? 1 : 0 }}
             >
               {i ? " " : ""}
               {w.text}

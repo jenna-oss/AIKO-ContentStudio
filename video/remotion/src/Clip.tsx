@@ -1,6 +1,5 @@
 // A short cut out of a long take: the footage itself, the brand's captions
-// burned onto it, and the hook treatment from page 5 of the brand guide over
-// the opening seconds.
+// burned onto it, and the hook over the opening seconds on solid plates.
 //
 // The captions are the same component the made-from-scratch videos use, fed
 // the same way — public/<slug>/captions.json — so a clip and a rendered video
@@ -8,24 +7,23 @@
 // timings rebased to this clip's own clock, which is why nothing has to be
 // transcribed twice.
 //
-// The hook is the sentence the clip opens on. The guide shows it as two
-// stacked blocks, the first white on black and the second black on Site
-// Orange, which is the one caption treatment the existing component does not
-// do.
+// The hook is the sentence the clip opens on, in Instrument Serif on two
+// stacked plates that meet as blocks: the statement in Paper on Electric, the
+// turn in Ink italic on Tangerine. Copy over a picture always sits on a plate.
 import React from "react";
 import { AbsoluteFill, OffthreadVideo, staticFile, useCurrentFrame, useVideoConfig } from "remotion";
-import { BLACK, HEAD, ORANGE, SAFE, SAFE_W, WHITE } from "./brand";
+import { DISPLAY, ELECTRIC, INK, PAPER, SAFE, SAFE_W, TANGERINE } from "./brand";
 import { Captions } from "./Captions";
 
 /** How long the hook holds before the ordinary captions carry it. */
 const HOOK_S = 2.6;
 /** Big, because it is the thing someone reads before deciding to stay — but
  *  only as big as will fit on one line, or the box wraps and the brand's two
- *  tidy blocks become one ragged slab. Archivo at weight 800 runs about
- *  0.52em a character. */
-const HOOK_MAX = 86;
-const HOOK_MIN = 42;
-const CHAR_EM = 0.52;
+ *  tidy blocks become one ragged slab. Instrument Serif runs about 0.44em a
+ *  character; it is narrow, so it can go bigger than a grotesque. */
+const HOOK_MAX = 104;
+const HOOK_MIN = 48;
+const CHAR_EM = 0.44;
 
 function hookSize(lines: string[]): number {
   const longest = Math.max(...lines.map((l) => l.length), 1);
@@ -76,17 +74,18 @@ function twoLines(text: string): string[] {
    box-decoration-break clones the background onto each fragment, which is what
    gives the guide its tight box per line. An inline-block cannot fragment, so
    a long line wrapped inside one rectangle and left a ragged edge. */
-const Line: React.FC<{ text: string; size: number; orange?: boolean }> = ({ text, size, orange }) => (
-  <div style={{ lineHeight: 1.42 }}>
+const Line: React.FC<{ text: string; size: number; turn?: boolean }> = ({ text, size, turn }) => (
+  <div style={{ lineHeight: 1.3 }}>
     <span
       style={{
         display: "inline",
-        backgroundColor: orange ? ORANGE : BLACK,
-        color: orange ? BLACK : WHITE,
-        fontFamily: HEAD,
-        fontWeight: 800,
+        backgroundColor: turn ? TANGERINE : ELECTRIC,
+        color: turn ? INK : PAPER,
+        fontFamily: DISPLAY,
+        fontWeight: 400,
+        fontStyle: turn ? "italic" : "normal",
         fontSize: size,
-        letterSpacing: "-0.01em",
+        letterSpacing: "0.005em",
         padding: "0.1em 0.22em",
         boxDecorationBreak: "clone",
         WebkitBoxDecorationBreak: "clone",
@@ -115,7 +114,7 @@ const Hook: React.FC<{ text: string }> = ({ text }) => {
     >
       <div style={{ width: SAFE_W }}>
         {lines.map((line, i) => (
-          <Line key={line + i} text={line} size={size} orange={i === 1} />
+          <Line key={line + i} text={line} size={size} turn={i === 1} />
         ))}
       </div>
     </AbsoluteFill>
@@ -129,7 +128,7 @@ export type ClipProps = {
   hook?: string;
   /** Seconds — the composition's length is worked out from this. */
   seconds: number;
-  /** Words the captions should put in Site Orange. */
+  /** Words the captions should put in Tangerine. */
   emphasis?: string[];
 };
 
@@ -139,7 +138,7 @@ export const Clip: React.FC<ClipProps> = ({ slug, hook, emphasis = [] }) => {
   const showing = hook ? frame / fps <= HOOK_S : false;
 
   return (
-    <AbsoluteFill style={{ backgroundColor: BLACK }}>
+    <AbsoluteFill style={{ backgroundColor: INK }}>
       <OffthreadVideo
         src={staticFile(`${slug}/clip.mp4`)}
         style={{ width: "100%", height: "100%", objectFit: "cover" }}

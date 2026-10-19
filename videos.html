@@ -199,7 +199,7 @@ function drawMaking(v) {
 
 function videoBlock(v) {
   return el('div', { class: 'row', style: { gap: '16px', alignItems: 'flex-start' } },
-    el('video', { src: v.url, controls: true, playsinline: true, preload: 'metadata', style: { width: '160px', aspectRatio: '9/16', background: '#000', borderRadius: '4px' } }),
+    el('video', { src: v.url, controls: true, playsinline: true, preload: 'metadata', style: { width: '160px', aspectRatio: '9/16', background: '#101114', borderRadius: '0' } }),
     el('div', { class: 'stack', style: { gap: '4px', flex: '1 1 200px' } }, el('h2', { text: v.topic || 'Untitled' }), el('span', { class: 'quiet', text: A.clock(v.duration || 0) + (v.kind === 'clip' ? ' · clip' : '') })));
 }
 

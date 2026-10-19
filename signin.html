@@ -4,33 +4,36 @@
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <meta name="robots" content="noindex, nofollow">
-<title>Sign in — Trilith marketing tool</title>
+<title>Sign in — AIKO Content Studio</title>
 <script src="./assets/theme.js"></script>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Instrument+Serif:ital@0;1&family=Public+Sans:wght@300;400;500;600&family=IBM+Plex+Mono:wght@400;500&display=swap" rel="stylesheet">
 <link rel="stylesheet" href="./assets/nav.css">
 <style>
   :root {
-    --forest:#0B3529; --cream-text:#EAE9D5; --emerald:#2C785E; --sage:#6E9C86;
-    --ground:#ECE9D8; --card:#F4F2E7; --card-sunk:#E3DFCB;
-    --ink:#103224; --ink-body:#3B5850; --ink-quiet:#6F8279;
-    --rule:#D2CDB6; --rule-strong:#B8B29A; --accent:#2C785E; --clay:#A65A3C;
-    --sans:"Poppins","Century Gothic","Avenir Next","Futura",system-ui,-apple-system,"Segoe UI",sans-serif;
+    --forest:#0B1A5C; --cream-text:#F3F5F9; --emerald:#3150FD; --sage:#C3CCE8;
+    --ground:#F3F5F9; --card:#F9FAFC; --card-sunk:#D9DEE7;
+    --ink:#101114; --ink-body:#3C4450; --ink-quiet:#3C4450;
+    --rule:#D9DEE7; --rule-strong:#C3CCE8; --accent:#3150FD; --clay:#B52C00;
+    --sans:"Public Sans","Helvetica Neue",Arial,system-ui,sans-serif;
+  --serif:"Instrument Serif",Georgia,"Times New Roman",serif;
   }
   @media (prefers-color-scheme: dark) {
     :root {
-      --ground:#072A1F; --card:#0E3B2C; --card-sunk:#0A3125;
-      --ink:#EAE9D5; --ink-body:#B9C9C0; --ink-quiet:#7E9A8D;
-      --rule:#1C4A3A; --rule-strong:#2A5D4A; --accent:#6E9C86; --clay:#C87A57;
+      --ground:#101114; --card:#101114; --card-sunk:#2B2E35;
+      --ink:#F3F5F9; --ink-body:#C3CCE8; --ink-quiet:#C3CCE8;
+      --rule:#2B2E35; --rule-strong:#3C4450; --accent:#C3CCE8; --clay:#FC3D05;
     }
   }
   :root[data-theme="light"] {
-    --ground:#ECE9D8; --card:#F4F2E7; --card-sunk:#E3DFCB;
-    --ink:#103224; --ink-body:#3B5850; --ink-quiet:#6F8279;
-    --rule:#D2CDB6; --rule-strong:#B8B29A; --accent:#2C785E; --clay:#A65A3C;
+    --ground:#F3F5F9; --card:#F9FAFC; --card-sunk:#D9DEE7;
+    --ink:#101114; --ink-body:#3C4450; --ink-quiet:#3C4450;
+    --rule:#D9DEE7; --rule-strong:#C3CCE8; --accent:#3150FD; --clay:#B52C00;
   }
   :root[data-theme="dark"] {
-    --ground:#072A1F; --card:#0E3B2C; --card-sunk:#0A3125;
-    --ink:#EAE9D5; --ink-body:#B9C9C0; --ink-quiet:#7E9A8D;
-    --rule:#1C4A3A; --rule-strong:#2A5D4A; --accent:#6E9C86; --clay:#C87A57;
+    --ground:#101114; --card:#101114; --card-sunk:#2B2E35;
+    --ink:#F3F5F9; --ink-body:#C3CCE8; --ink-quiet:#C3CCE8;
+    --rule:#2B2E35; --rule-strong:#3C4450; --accent:#C3CCE8; --clay:#FC3D05;
   }
   * { box-sizing: border-box; }
   body {
@@ -40,23 +43,26 @@
   }
   main { flex:1; display:flex; flex-direction:column; align-items:center; padding:3rem 1rem; }
   #clerk { width:100%; display:flex; justify-content:center; }
-  .msg { max-width:400px; width:100%; margin:0 0 1rem; font-size:.8125rem; border-radius:4px; padding:.5rem .625rem; }
+  .msg { max-width:400px; width:100%; margin:0 0 1rem; font-size:.8125rem; border-radius:0; padding:.5rem .625rem; }
   .msg.bad { background:var(--card-sunk); color:var(--clay); }
   .msg.ok { background:var(--card-sunk); color:var(--ink-body); }
   .msg[hidden] { display:none; }
+  /* The wordmark: a Tangerine rule above roman AIKO and italic Group. There is no
+     symbol; the rule is the mark. On the Deep header the type is Paper. */
+  .wm { display:inline-flex; flex-direction:column; gap:3px; font-family:var(--serif); font-weight:400; line-height:.9; letter-spacing:.005em; color:var(--cream-text); }
+  .wm::before { content:""; width:1.05em; height:.18em; background:#FC3D05; }
+  .wm > span { white-space:nowrap; }
+  .wm em { font-style:italic; }
+  .site-brand .wm { font-size:26px; }
 </style>
 </head>
 <body>
 
 <header class="site-head">
   <span class="site-brand">
-    <svg width="30" height="30" viewBox="0 0 30 30" aria-hidden="true">
-      <circle cx="15" cy="15" r="13.5" fill="none" stroke="#6E9C86" stroke-width="1.25"/>
-      <text x="15" y="18.5" text-anchor="middle" fill="#EAE9D5"
-            font-family="Poppins, Century Gothic, sans-serif" font-size="7.5" font-weight="700">AIKO</text>
-    </svg>
+    <span class="wm" aria-hidden="true"><span>AIKO <em>Group</em></span></span>
     <span>
-      <span class="name">Trilith marketing tool</span><br>
+      <span class="name">Content Studio</span><br>
       <span class="who">aikogroup.io — internal</span>
     </span>
   </span>
@@ -95,7 +101,7 @@ function appearance() {
   const v = (name) => css.getPropertyValue(name).trim();
   return {
     variables: {
-      colorPrimary: '#2C785E',
+      colorPrimary: '#3150FD',
       colorBackground: v('--card'),
       colorText: v('--ink'),
       colorTextSecondary: v('--ink-quiet'),

@@ -32,6 +32,9 @@ const ARGS = (typeof args !== 'undefined' && args) ? args : {}
 const PROJECT_ROOT = BAKED_ROOT || ARGS.root || 'C:/Users/jenna/Downloads/NicheScraper/newsletter_video_pipeline'
 const REMOTION_ROOT = `${PROJECT_ROOT}/remotion`
 const HOOK_LIBRARY_PATH = `${PROJECT_ROOT}/hook_templates_1000.json`
+// The follow handle the closing frame shows. Keep it the same as HANDLE in
+// remotion/src/brand.ts, which is what the video actually draws.
+const HANDLE = '@aikogroup'
 const ENV_HINT = (BAKED_ROOT || ARGS.root)
   ? 'the ELEVENLABS_API_KEY environment variable (already set on this runner)'
   : `${PROJECT_ROOT}/.env (ELEVENLABS_API_KEY)`
@@ -118,81 +121,9 @@ screen there. Read the image to see what the reviewer meant, then make the match
 what the note asks.`
 }
 
-const BACKGROUNDS = ['black', 'white', 'concrete', 'footage', 'photo']
-
-// The channel's own photo library: video/remotion/public/library, shown
-// full-bleed behind the opening. Kept here because prompts are built here and
-// planViolations checks the names; to add one, drop the file in that folder
-// and add a line (see video/README.md).
-const PHOTO_LIBRARY = [
-  ['big-house.jpg', 'a couple walking up to a large villa, long reflecting pool, gardens and hills'],
-  ['mansion-cars.jpg', 'a man in a tan suit outside a mansion, classic cars and a helicopter on the drive'],
-  ['pool-city-night.jpg', 'a couple in evening dress by a pool at night, city lights below'],
-  ['helicopter-estate.jpg', 'a raised champagne glass as a helicopter lands on a country estate lawn'],
-  ['mountain-lounge.jpg', 'a lounge behind floor-to-ceiling glass, snowy mountains outside'],
-  ['champagne-lunch.jpg', 'two men in suits and sunglasses over champagne, fountain and palms behind'],
-  ['grand-dining.jpg', 'a candlelit dining room under a chandelier, a mountain mural filling the wall'],
-  ['rooftop-city.jpg', 'men in suits crossing a rooftop helipad above a hazy skyline'],
-  ['jet-briefcase.jpg', 'a man in a private jet cabin, an open briefcase of cash beside him'],
-  ['chair-cash.jpg', 'a man in a cream suit in a leather chair by a marina window, stacks of cash on the table'],
-  ['fur-coat-car.jpg', 'a man in a full-length fur coat beside a white Rolls-Royce on a mountain road'],
-  ['polo-horse.jpg', 'a man in black tie on horseback with a drink and a silver tray'],
-  ['tokyo-bar.jpg', 'two men in suits with cigars at a dark bar'],
-  ['event-crowd.jpg', 'a crowd in evening dress and furs at a busy event'],
-  ['phone-call.jpg', 'a close-up of a man in an open shirt grinning into a phone'],
-  ['terrace-signing.jpg', 'a man in a white shirt signing papers on a sunset terrace, men in black tie behind, a helicopter over the sea'],
-  ['robe-staircase.jpg', 'a man in a white bathrobe coming down a marble staircase under a chandelier, staff in black tie lined up'],
-  ['helipad-plans.jpg', 'a man in a white suit signing plans on a helipad, stacks of cash at his feet, a helicopter behind'],
-  ['cliff-umbrella.jpg', 'men at a table on a cliff-top terrace over the sea, a butler holding a white umbrella over them'],
-  ['leopard-robe.jpg', 'a man in a leopard-print robe on two phones at once, cash piled around him, a butler at his side'],
-  ['skyline-lounge.jpg', 'a man in a silk shirt lounging behind a table of cash, a city skyline at night through the window'],
-  ['gold-delivery.jpg', 'a helicopter lowering a pallet of gold bars onto a villa lawn, two vintage convertibles below'],
-  ['desk-asleep.jpg', 'a man asleep face-down on a desk covered in cash, another man in a suit leaning over him, a sea view'],
-  ['city-model.jpg', 'a man in shirt and tie leaning over a lit model of a city, the real skyline at night behind him'],
-  ['briefcase-dusk.jpg', 'two men in suits carrying briefcases toward a city view at dusk'],
-  ['yacht-crane-car.jpg', 'a vintage Aston Martin hanging from a yacht\'s crane, two men in suits watching from the dock'],
-  ['cash-library.jpg', 'a man in black tie on a library ladder, the shelves stacked with cash'],
-  ['robe-desk-call.jpg', 'a man in a white robe on the phone at a desk covered in cash, a helicopter outside the window'],
-  ['cliff-villa.jpg', 'a cliff-top villa above the sea with a helicopter overhead, a man sitting at a table on the lawn'],
-  ['diving-board-waiter.jpg', 'a waiter in a white dinner jacket serving drinks from a diving board over the sea, a man swimming below'],
-  ['vault-gold.jpg', 'a woman in sunglasses and a white suit lifting gold bars out of a vault of safe-deposit boxes'],
-  ['balcony-briefcase.jpg', 'a man on a ladder from a car handing a briefcase up to a balcony, a city skyline below'],
-  ['hand-cash.jpg', 'a close-up of a hand in a gold watch and rings tossing banknotes onto a pile of cash'],
-  ['auction-bid.jpg', 'a man in black tie raising his hand to bid at a packed auction, a gilt-framed painting behind'],
-  ['cash-shelves.jpg', 'a man in black tie at the top of a library ladder, every shelf stacked with bundles of cash'],
-  ['jet-lawn-laugh.jpg', 'two men in suits laughing on a lawn by a private jet\'s door, one carrying a leather bag'],
-  ['pool-butler.jpg', 'a butler in a white jacket wading through a pool with a tray of drinks, a man on a gold float, sports cars behind'],
-  ['handshake-watch.jpg', 'a close-up handshake over a silver case, gold watches and rings on both hands'],
-  ['balcony-champagne.jpg', 'a man on a seaside balcony catching a champagne bottle lowered on a rope from the floor above'],
-  ['helicopter-pool-house.jpg', 'a helicopter landing by a lit glass house at night, a pool and a red sports car in front'],
-  ['yacht-paperwork.jpg', 'a man in a suit at the end of a yacht\'s long table covered in papers, the sea through the windows'],
-  ['skyline-office.jpg', 'a desk with a gold telephone, stacks of cash and crystal under a chandelier, a city skyline outside'],
-  ['penthouse-dinner.jpg', 'a black-tie dinner at a penthouse window, the floor strewn with banknotes'],
-  ['chandelier-counting.jpg', 'a man in black tie counting cash at a table under a chandelier, city lights at night behind'],
-  ['gold-hall.jpg', 'a cart stacked with gold bars in a marble entrance hall, a silver sports car parked inside, a butler beside it'],
-  ['car-hood-signing.jpg', 'a woman in a white suit and sunglasses signing papers on the hood of a white sports car, men loading silver cases'],
-  ['tennis-court-cash.jpg', 'men in suits around a table piled with cash on a clay tennis court above a coastal town, waiters behind'],
-  ['harbour-helipad.jpg', 'a man in a suit on a harbour helipad as a helicopter lands, superyachts and a hillside city behind'],
-  ['gate-briefcase.jpg', 'a man in a suit handing a monogrammed briefcase into a white car at a gilded gate, a driver in sunglasses'],
-  ['gold-airdrop.jpg', 'a helicopter lowering a pallet of gold bars into a villa garden, a red sports car below'],
-  ['poolside-phone-gold.jpg', 'a woman in red and sunglasses on a corded phone at a poolside table, stacks of gold bars beside her tea'],
-]
-// The photos this video may use: the library less the ones the newest videos
-// used, so openings rotate instead of one favourite coming back every time.
-// Put in the brief's preferred order, which differs per video in a batch. If
-// leaving them out would leave nothing, nothing is left out.
-const PHOTO_FILES = (() => {
-  const all = PHOTO_LIBRARY.map(([file]) => file)
-  const fresh = all.filter(f => !BRIEF.photosAvoid.includes(f))
-  if (!fresh.length) return all
-  const rank = (f) => { const i = BRIEF.photosOrder.indexOf(f); return i < 0 ? Infinity : i }
-  return fresh.map((f, i) => [f, i]).sort((a, b) => rank(a[0]) - rank(b[0]) || a[1] - b[1]).map(([f]) => f)
-})()
-const photoBlock = () => `THE CHANNEL'S PHOTO LIBRARY (${REMOTION_ROOT}/public/library, used with staticFile("library/<file>")).
-These are the look of the life the deal pays for: warm, filmic, old money. Pick one that fits this video's own
-promise, not whichever is grandest. Only these are open to this video: the rest were used by recent videos.
-If several fit equally well, take the one listed first.
-${PHOTO_FILES.map(file => `- ${file}: ${PHOTO_LIBRARY.find(([f]) => f === file)[1]}`).join('\n')}`
+// The grounds a scene may sit on, from the AIKO brand system. "horizon" is the
+// hard horizon: an Electric field meeting a Tangerine field on a straight edge.
+const BACKGROUNDS = ['electric', 'tangerine', 'paper', 'ink', 'deep', 'horizon', 'footage']
 
 // The videos were reading as lectures, so the opening sells what the money
 // makes possible and the lesson follows (2026-09-19).
@@ -279,7 +210,7 @@ const SCRIPT_SCHEMA = {
             type: 'array',
             maxItems: 2,
             items: { type: 'string' },
-            description: 'one or two words copied exactly from this line that carry it -- the number, the key term, the verdict. They turn Site Orange in the captions.',
+            description: 'one or two words copied exactly from this line that carry it -- the number, the key term, the verdict. They turn Tangerine in the captions.',
           },
         },
       },
@@ -322,9 +253,8 @@ const VISUAL_PLAN_SCHEMA = {
           order: { type: 'number' },
           idea: { type: 'string', description: 'this scene\'s own visual idea: what is on screen and how it moves, specific to this line -- specific enough for the assembly step to build it' },
           background: { type: 'string', enum: BACKGROUNDS },
-          photo: { type: 'string', description: 'if background is "photo", the library file name, e.g. "big-house.jpg"' },
-          accent: { type: 'string', enum: ['orange', 'green', 'none'] },
-          accentOn: { type: 'string', description: 'the word or number the accent colour goes on' },
+          accent: { type: 'string', enum: ['italic', 'none'], description: '"italic" when the scene sets its turn -- the word or clause that reframes the line -- in Instrument Serif italic' },
+          accentOn: { type: 'string', description: 'the word or clause set in italic' },
           needsAsset: { type: 'boolean' },
           assetSearchHint: { type: 'string', description: 'if needsAsset, 2-3 keyword phrases for a Pexels VIDEO search specific to this beat\'s line' },
         },
@@ -413,49 +343,60 @@ const NO_OVERLAP = `- Nothing overlaps text. No line, arrow, bar, dot, shape, im
   sits beside the point, never where a line ends or passes, and a line that rises to a value stops short of that
   value's label. Every scene's frames are checked for this after the render.`
 
-// The Buy Box brand guide's look, for the stages that design scenes. Rules,
-// never layouts: there is no component library, so every scene is designed
-// from scratch and the videos keep their variety.
-const BRAND_LOOK = `THE LOOK: The Buy Box brand guide. Every value lives in ${REMOTION_ROOT}/src/brand.ts; import it, never hard-code it.
-- Surfaces: BLACK or WHITE, full-bleed; CONCRETE for panels on white; GRAPHITE for small labels and rules. Extremely
-  high contrast is the point.
-- Accents carry meaning. ORANGE (Site Orange) marks the one thing to look at in a scene: the problem, the cost, the
-  key word or number. GREEN (Pencil) marks the answer: fundable, the fix, "after". One accent colour per scene at
-  most, and green only for an answer.
-- Type: HEAD (Archivo, weight 800-900) for every headline and number; BODY (Inter, weight 500-700) for labels. Go
-  big: headlines at least MIN_HEADLINE (110px), key numbers 220-420px, nothing below MIN_TEXT (40px). At most six
-  words of headline on screen at once. Sentence case, ending in a period: declarative, like the voice.
-- The guide's headline box: a line of Archivo in a tight BLACK box with WHITE text, the key line in an ORANGE box,
-  one box per line, stacked. Use it where a statement should hit, especially over footage.
-- Shapes: square corners, thick solid bars, flat colour. No gradients, shadows, rounded corners, cream or navy.
+// The AIKO brand system's look (direction 8C), for the stages that design
+// scenes. Rules, never layouts: there is no component library, so every scene
+// is designed from scratch and the videos keep their variety.
+const BRAND_LOOK = `THE LOOK: the AIKO brand system. Every value lives in ${REMOTION_ROOT}/src/brand.ts; import it, never hard-code it.
+- Grounds, full-bleed, hard-edged: ELECTRIC (the workhorse, about a third of the scenes), TANGERINE (an equal
+  partner, not an accent), PAPER, INK and DEEP (dense data). PAPER_RAISED for cards on Paper, LINE for hairlines
+  on Paper. No gradients, tints, washes, shadows or rounded corners. Hard edges only.
+- Type on each ground -- these pairings are the only legal ones, and ON in ./brand lists them:
+  ELECTRIC: PAPER type. TANGERINE: INK type, INK_WARM for secondary. PAPER: INK or ELECTRIC type, SLATE for
+  secondary. INK: PAPER or TANGERINE type. DEEP: PAPER type, SKY for secondary.
+  Tangerine is never type on Paper, Electric or Deep. Electric and Tangerine meet as blocks, never as type on type.
+- The rule: a short thick bar, TANGERINE on every ground except TANGERINE, where it is INK. Dividers are 4px
+  ELECTRIC on dark grounds, 1.5px LINE on Paper.
+- Type: DISPLAY (Instrument Serif, weight 400) for every headline, hook and number, roman for the statement and
+  italic for the turn -- the word or clause that reframes it. One italic phrase per scene, never more.
+  letterSpacing 0 to 0.01em on DISPLAY, never negative; lineHeight 0.92-0.98 (DISPLAY_LEADING). TEXT (Public
+  Sans, 300-500) for body copy only, never a headline. LABEL (IBM Plex Mono, 500) for eyebrows, rail labels,
+  counters and the handle: uppercase, letterSpacing 0.2em-0.28em. Go big: headlines at least MIN_HEADLINE
+  (110px), key numbers 300-520px, nothing below MIN_TEXT (40px). At most six words of headline on screen at once.
+  Sentence case, ending in a period: short and declarative, then the turn.
+- Signature devices, use them: the hard horizon (an ELECTRIC field meets a TANGERINE field on a straight edge, and
+  a two-part line lands half on each, each half in its own legal ink: PAPER on the blue, INK on the tangerine),
+  and the cropped word (one word blown up past the frame's edge until it becomes the ground; any copy over it
+  sits on its own solid PAPER or INK plate, never loose).
+- Copy over footage always sits on a solid plate (PAPER with INK type, or INK with PAPER type). Never loose
+  text on a picture.
 - Safe zone: aim to put every scene's text inside <SafeArea> (from ./brand), the part of the frame inside
   Instagram's safe zone and above the captions. Absolute offsets inside it are relative to it, so bottom: 0 sits
-  just above the captions. Full-bleed backgrounds and footage go outside it. When a scene needs a little more room
+  just above the captions. Full-bleed grounds and footage go outside it. When a scene needs a little more room
   to keep its text from overlapping, text may go up to SAFE_SLACK (40px) past the safe zone's top, left or right
   edge, or dip below SafeArea's bottom, but never lower than CAPTION_TOP: below that it hits the captions, and
   below the safe zone it sits under Instagram's own controls.
-- Alignment: centred by default. Centre a scene's text both ways inside <SafeArea> (it is a flex column: set
-  alignItems: "center" and justifyContent: "center", and textAlign: "center" on text that wraps) rather than
-  starting it at the top-left. Left-aligned text is the exception, used in at most two scenes where a list or a
-  stack reads better that way, and where footage needs the text kept off the subject.
+- Alignment: left-aligned, like the brand's canvases, with a mono label at the top-left of the scene where one
+  helps. Centre only a single number or a single short line that stands alone.
 ${NO_OVERLAP}
-- Motion: quick and sure. Boxes and lines slide in on a short stagger, numbers count up, things stop hard. No
+- Motion: quick and sure. Plates and rules slide in on a short stagger, numbers count up, things stop hard. No
   wobble, bounce or flash.`
 
 const VARIETY = `VARIETY: there is no component library. Design every scene from scratch for its own line, and make them
 differ: composition (a number filling the frame, a stack of headline boxes, a split screen, a list that builds, a
-simple diagram, one word alone), scale and motion should all change from scene to scene. Vary those, not the
-alignment: text stays centred, as THE LOOK says, apart from its few exceptions. Don't repeat a layout within the
+simple diagram, one word alone, a cropped word), scale and motion should all change from scene to scene. Vary
+those, not the alignment: text stays left-aligned, as THE LOOK says, apart from its few exceptions. Don't repeat a layout within the
 video, and don't copy one from this account's older videos.`
 
 function mechanicsBlock() {
-  return `Remotion mechanics -- read these for how things are wired, not for how they look (their look predates the brand):
-- ${REMOTION_ROOT}/src/DSCRVideo.tsx: TransitionSeries, the s() helper, SWIPE, OffthreadVideo for footage
+  return `Remotion mechanics -- read these for how things are wired. ExampleVideo's scenes show the brand, but never copy
+its layouts:
+- ${REMOTION_ROOT}/src/ExampleVideo.tsx: TransitionSeries, the s() helper, SWIPE, OffthreadVideo for footage,
+  the hard horizon, the cropped word and the closing frame
 - ${REMOTION_ROOT}/src/Root.tsx: the composition registry -- follow its exact pattern for TOTAL_S and <Composition>
-- ${REMOTION_ROOT}/src/brand.ts: colours, fonts, logo, safe zone and size floors -- the only source for any of them
+- ${REMOTION_ROOT}/src/brand.ts: colours, legal pairings (ON), fonts, the Wordmark, safe zone and size floors -- the
+  only source for any of them
 - ${REMOTION_ROOT}/src/Captions.tsx: the caption overlay every video carries
-Don't import ./tokens, ./fonts or anything in ./components: they are the old look. Write the scene components
-inline in the new video file.`
+Write the scene components inline in the new video file.`
 }
 
 phase('Research')
@@ -603,7 +544,7 @@ ${PROJECT_ROOT}/data/script_*.json show this account's beat length and pacing; u
 because their tone predates the brand guide and the brand voice above wins.
 
 For each beat, give emphasis: the one or two words from that line a viewer should catch -- the number,
-the key term, the verdict -- copied exactly as they appear in the line. They turn orange in the captions.
+the key term, the verdict -- copied exactly as they appear in the line. They turn Tangerine in the captions.
 
 The last beat asks the viewer to follow The Buy Box, in the brand voice: one short line, tied to what the
 video just taught, with no hype (e.g. "Follow The Buy Box for the math on the next deal.").${draft ? `
@@ -761,7 +702,7 @@ function voiceIssues(s, from) {
 }
 
 // Emphasis words have to be in their line, or the captions have nothing to
-// turn orange. Anything the writer invented is dropped here, not argued with.
+// turn Tangerine. Anything the writer invented is dropped here, not argued with.
 function cleanEmphasis(s) {
   for (const b of s.beats) {
     const line = String(b.line).toLowerCase()
@@ -834,35 +775,32 @@ ${BRAND_LOOK}
 ${VARIETY}
 
 For each beat give:
-- idea: this scene's own visual idea -- what is on screen and how it moves, specific to its line (e.g. "0.83
-  fills the frame in Archivo, an orange bar wipes in under it, 'rent divided by the payment' types in below").
-- background: black, white, concrete, footage (a real video clip behind the text), or photo (one of the
-  channel's own photographs in a black frame, with the scene's words straddling one of its edges -- see THE
-  LOOK); with photo, also give its file name in the "photo" field and say in the idea whether the picture sits
-  high with the words across its bottom edge or low with the words across its top edge.
-- accent: orange for the one thing to look at, green only when the beat is the answer or the fix, or none;
-  accentOn: the word or number it goes on.
+- idea: this scene's own visual idea -- what is on screen and how it moves, specific to its line (e.g. "20 fills
+  the frame in Electric on Paper, a tangerine rule wipes in under it, 'minutes from you' rises below with 'from
+  you' in italic").
+- background: electric, tangerine, paper, ink, deep, horizon (the hard horizon: Electric above, Tangerine below,
+  the line landing half on each), or footage (a real video clip behind the text, which sits on a solid plate).
+- accent: italic when the scene sets its turn in italic, or none; accentOn: the word or clause it goes on.
 - needsAsset, and if true assetSearchHint: 2-3 keyword phrases for a Pexels VIDEO search specific to THIS
   beat's line (not a generic topic keyword).
 
 HARD RULES (a plan that breaks these is rejected and you'll be asked again):
 1. No two beats in a row share a background.
 2. background is "footage" exactly when needsAsset is true. Aim for two or three footage beats: not zero, not
-   most of them. A photo beat never needs an asset: needsAsset is false.
-2a. Beat 1's background is "photo", with a photo named from the library below: the opening shows the life this is
-   about. Up to two more beats in the first half may use a photo, each a different file, and never two photo
-   beats in a row.
-3. The last beat is the closing frame (the logo, the takeaway, "Follow @thebuyboxre"); its background is black
-   or white.
-4. At least one beat uses orange.
+   most of them.
+2a. Beat 1 opens the video on a brand device: its background is "horizon", or "electric" or "tangerine" with a
+   cropped word. "horizon" is used at most twice.
+2b. Electric is the workhorse: at least a quarter of the beats are "electric". At most two beats are "tangerine"
+   in any nine.
+3. The last beat is the closing frame (the wordmark, the takeaway, "Follow ${HANDLE}"); its background is
+   electric or tangerine.
+4. At least one beat sets its turn in italic, and no beat has more than one italic phrase.
 5. One entry per beat, in order.
-
-${photoBlock()}
 
 The viewer may be brand new to real estate investing. Where a beat explains a term, its idea puts the term and
 its plain meaning on screen together, and every number shown gets a plain label.
 
-Beats (with the words the captions will turn orange):
+Beats (with the words the captions will turn Tangerine):
 ${script.beats.map(b => `${b.order}. (${b.estSeconds}s) ${b.line}${b.emphasis.length ? `  [emphasis: ${b.emphasis.join(', ')}]` : ''}`).join('\n')}
 ${feedback ? `\nYour previous attempt broke these rules, fix them: ${feedback}` : ''}`,
     { schema: VISUAL_PLAN_SCHEMA, label: `visual-plan-attempt-${attempt}` }
@@ -886,29 +824,21 @@ function planViolations(plan) {
       problems.push(`beat ${b.order}: background "footage" and needsAsset have to go together`)
     }
   }
-  const photoBeats = beats.filter(b => b.background === 'photo')
-  if (beats.length && beats[0].background !== 'photo') {
-    problems.push('beat 1 opens the video, so its background must be a photo from the library')
+  if (beats.length && !['horizon', 'electric', 'tangerine'].includes(beats[0].background)) {
+    problems.push('beat 1 opens the video, so its background must be horizon, electric or tangerine')
   }
-  for (const b of photoBeats) {
-    if (!PHOTO_FILES.includes(b.photo)) {
-      problems.push(BRIEF.photosAvoid.includes(b.photo)
-        ? `beat ${b.order}: "${b.photo}" was used by a recent video; pick one of the photos listed`
-        : `beat ${b.order}: "${b.photo || '(none)'}" is not a file in the photo library`)
-    }
+  const count = (bg) => beats.filter(b => b.background === bg).length
+  if (count('horizon') > 2) problems.push(`${count('horizon')} horizon beats; two is the most`)
+  if (beats.length && count('electric') < Math.ceil(beats.length / 4)) {
+    problems.push(`only ${count('electric')} electric beat(s); at least ${Math.ceil(beats.length / 4)} of ${beats.length} should be electric`)
   }
-  if (photoBeats.length > 3) problems.push(`${photoBeats.length} photo beats; three is the most`)
-  if (new Set(photoBeats.map(b => b.photo)).size !== photoBeats.length) {
-    problems.push('the same photo is used twice; each photo beat uses a different file')
-  }
-  if (photoBeats.some(b => b.order > Math.ceil(beats.length / 2))) {
-    problems.push('photos belong in the first half of the video')
-  }
+  const maxTangerine = Math.max(2, Math.floor(beats.length * 2 / 9))
+  if (count('tangerine') > maxTangerine) problems.push(`${count('tangerine')} tangerine beats; ${maxTangerine} is the most for ${beats.length} beats`)
   const last = beats[beats.length - 1]
-  if (last && !['black', 'white'].includes(last.background)) {
-    problems.push(`beat ${last.order} is the closing frame, so its background must be black or white`)
+  if (last && !['electric', 'tangerine'].includes(last.background)) {
+    problems.push(`beat ${last.order} is the closing frame, so its background must be electric or tangerine`)
   }
-  if (beats.length && !beats.some(b => b.accent === 'orange')) problems.push('no beat uses orange; at least one scene needs it')
+  if (beats.length && !beats.some(b => b.accent === 'italic')) problems.push('no beat sets its turn in italic; at least one scene needs it')
   if (beats.length !== script.beats.length) problems.push(`the plan has ${beats.length} entries for ${script.beats.length} beats`)
   return problems.length ? problems.join('; ') : null
 }
@@ -973,26 +903,16 @@ Visual plan (each scene's idea, background and accent):
 ${JSON.stringify(visualPlan.beats, null, 2)}
 
 Approved assets (beatOrder -> local file path + crop mode). A footage beat whose asset is not listed here was
-not approved: design that scene on BLACK or WHITE instead.
+not approved: design that scene on ELECTRIC, PAPER or INK instead.
 ${JSON.stringify(assetResults.filter(Boolean).filter(r => r.approved), null, 2)}
 
-Footage plays full-bleed with <OffthreadVideo> for cropMode "cover", or contained (object-fit: contain) on BLACK
-or WHITE for "contain-white", with the scene's text over it in the guide's headline boxes.
+Footage plays full-bleed with <OffthreadVideo> for cropMode "cover", or contained (object-fit: contain) on INK
+or PAPER for "contain-white", with the scene's text over it on a solid PAPER or INK plate.
 
-A "photo" beat is one of the channel's own photographs in a black frame, with the scene's words straddling one
-of its edges. On a BLACK background, with PHOTO_FRAME from ./brand and "const F = PHOTO_FRAME.high" (picture up,
-words across its bottom edge) or "PHOTO_FRAME.low" (picture down, words across its top edge) -- the plan says
-which, and they alternate across videos:
-  <Img src={staticFile("library/<the plan's photo>")}
-       style={{ position: "absolute", top: F.top, left: PHOTO_FRAME.left, width: PHOTO_FRAME.width,
-                height: F.height, objectFit: "cover" }} />
-(import { Img, staticFile } from "remotion"). The words go in the guide's headline boxes, stacked and centred,
-crossing that edge: about a third of the stack over the picture and the rest over the black, so for the bottom
-edge the stack starts near F.bottom - 170, and for the top edge it ends near F.top + 170. Nothing else sits on
-the picture, and the black around it stays empty.
-Leave the photograph as it is -- no tint, blur, gradient or border -- and let it move slowly: a gentle scale from
-1 to about 1.06 across the scene.
-${photoBlock()}
+A "horizon" beat is the hard horizon: an ELECTRIC field above and a TANGERINE field below, meeting on one
+straight horizontal edge somewhere between about 45% and 60% of the frame's height. The line is split in two:
+the statement in PAPER on the blue, just above the edge, and the turn in INK italic on the tangerine, just below
+it. ExampleVideo's Horizon scene is the pattern; vary where the edge sits and how the halves arrive.
 
 ${BRAND_LOOK}
 
@@ -1001,14 +921,15 @@ ${VARIETY}
 CAPTIONS: wrap the TransitionSeries in an <AbsoluteFill> and put
   <Captions slug="${research.slug}" emphasis={${JSON.stringify(emphasisWords)}} />
 after it, as the top layer (import { Captions } from "./Captions"). It shows the narration word by word, key words
-in orange, once the voiceover exists; before that it renders nothing. Don't draw running captions of your own:
+in Tangerine, once the voiceover exists; before that it renders nothing. Don't draw running captions of your own:
 scene text is headlines and labels, not a transcript.
 
-CLOSING FRAME: the last scene carries the follow line. Design it fresh like every other scene, but it always shows
-the logo (<Img src={LOGO_WHITE} /> on BLACK, LOGO_BLACK on WHITE), the takeaway -- "${script.takeaway}" -- and the
-follow ask with HANDLE (@thebuyboxre).
+CLOSING FRAME: the last scene carries the follow line. Design it fresh like every other scene, on ELECTRIC or
+TANGERINE, but it always shows the wordmark (<Wordmark ground={ELECTRIC} /> or <Wordmark ground={TANGERINE} />
+from ./brand, never redrawn by hand), the takeaway -- "${script.takeaway}" -- and the follow ask with HANDLE
+(${HANDLE}) in LABEL type.
 
-Overflow safety: Archivo at weight 900 runs about 0.62 x fontSize per character, so characters x fontSize x 0.62
+Overflow safety: Instrument Serif runs about 0.44 x fontSize per character, so characters x fontSize x 0.44
 must fit SAFE_W (820px) or the element's own width. Wrap it (a maxWidth with normal wrapping) or size it down;
 never let text run off-frame.
 
@@ -1057,7 +978,7 @@ or its post-generation speedup step -- both are required, not optional:
   (STABILITY 0.15, STYLE 1.0) -- keep its defaults unless the change requested below is about the voice.
 - fill EMPHASIS as well as LINES: one list per line, holding that line's emphasis words from the script
   below, copied exactly as they appear in the line. They are sent to the voice in capitals so it punches
-  them, and they are the same words the captions turn orange, so the two land together. A line with no
+  them, and they are the same words the captions turn Tangerine, so the two land together. A line with no
   emphasis gets an empty list.${BRIEF.revision ? `
 
 ${revisionBlock()}
@@ -1138,8 +1059,8 @@ taste, only whether everything can be read.
    - text cut off by the edge of the frame or hidden behind something
    - scene text colliding with the word-by-word captions near the bottom of the frame
    Not a problem: a headline box behind its own text, the captions themselves, text in a full-bleed footage
-   scene over its own backing box, the opening photo's headline boxes crossing the edge of the picture (that is
-   the design), empty space, a design you would have done differently.
+   scene over its own backing plate, a hard horizon's two fields meeting behind the line (that is the design), a
+   cropped word running off the frame behind its plate (that is the design too), empty space, a design you would have done differently.
 4. Write your findings to ${FRAME_REPORT}, replacing anything already there: one line per problem, "scene N:
    what", or an empty file if there are none.
 Report framesChecked and the problems.`,

@@ -9,16 +9,16 @@
  * ------------------------------------------------------------------------ */
 
 .chat {
-  --chat-accent:  var(--accent, var(--accent-on-ground, #2C785E));
-  --chat-card:    var(--card, #F4F2E7);
-  --chat-sunk:    var(--card-sunk, #E3DFCB);
-  --chat-rule:    var(--rule, #D2CDB6);
-  --chat-rule-2:  var(--rule-strong, #B8B29A);
-  --chat-ink:     var(--ink, #103224);
-  --chat-body:    var(--ink-body, #3B5850);
-  --chat-quiet:   var(--ink-quiet, #6F8279);
-  --chat-clay:    var(--clay, #A65A3C);
-  --chat-go:      var(--emerald, #2C785E);
+  --chat-accent:  var(--accent, var(--accent-on-ground, #3150FD));
+  --chat-card:    var(--card, #F9FAFC);
+  --chat-sunk:    var(--card-sunk, #D9DEE7);
+  --chat-rule:    var(--rule, #D9DEE7);
+  --chat-rule-2:  var(--rule-strong, #C3CCE8);
+  --chat-ink:     var(--ink, #101114);
+  --chat-body:    var(--ink-body, #3C4450);
+  --chat-quiet:   var(--ink-quiet, #3C4450);
+  --chat-clay:    var(--clay, #B52C00);
+  --chat-go:      var(--emerald, #3150FD);
   --chat-sans:    var(--sans, system-ui, sans-serif);
   --chat-mono:    var(--mono, ui-monospace, monospace);
 
@@ -54,7 +54,7 @@
 }
 .chat .msg.user .bubble {
   background: var(--chat-sunk); border: 1px solid var(--chat-rule);
-  border-radius: 4px; padding: .75rem 1rem; color: var(--chat-ink);
+  border-radius: 0; padding: .75rem 1rem; color: var(--chat-ink);
 }
 .chat .msg.bot .bubble { white-space: pre-wrap; }
 .chat .msg.bot .bubble strong { color: var(--chat-ink); }
@@ -63,11 +63,11 @@
 .chat .msg.bot .bubble a { color: var(--chat-accent); text-decoration: underline; text-underline-offset: 2px; }
 .chat .msg.bot .bubble code {
   font-family: var(--chat-mono); font-size: .8125rem;
-  background: var(--chat-sunk); padding: .0625rem .3125rem; border-radius: 2px;
+  background: var(--chat-sunk); padding: .0625rem .3125rem; border-radius: 0;
 }
 .chat .msg.error .bubble {
   border: 1px solid var(--chat-clay); border-left: 3px solid var(--chat-clay);
-  border-radius: 4px; padding: .75rem 1rem; color: var(--chat-clay); font-size: .875rem;
+  border-radius: 0; padding: .75rem 1rem; color: var(--chat-clay); font-size: .875rem;
 }
 
 /* The one line shown while the agent works. Quiet on purpose: it says
@@ -145,7 +145,7 @@
 .chat .rec-chip[aria-pressed="true"] {
   background: var(--accent);
   border-color: var(--accent);
-  color: #F4F2E7;
+  color: #F9FAFC;
   font-weight: 600;
 }
 .chat .rec-manage {
@@ -167,7 +167,7 @@
   flex: none; display: inline-flex; align-items: center; justify-content: center;
   width: 44px; height: 44px; padding: 0; cursor: pointer;
   color: var(--chat-body); background: transparent;
-  border: 1px solid var(--chat-rule-2); border-radius: 4px;
+  border: 1px solid var(--chat-rule-2); border-radius: 0;
 }
 .chat-composer .chat-attach:hover { border-color: var(--chat-accent); color: var(--chat-ink); }
 .chat-composer .chat-attach:disabled { opacity: .5; cursor: not-allowed; }
@@ -176,13 +176,13 @@
 .chat-composer { display: flex; gap: .625rem; align-items: flex-end; }
 .chat-composer textarea {
   flex: 1; font-family: var(--chat-sans); font-size: .9375rem; color: var(--chat-ink);
-  background: var(--chat-card); border: 1px solid var(--chat-rule-2); border-radius: 4px;
+  background: var(--chat-card); border: 1px solid var(--chat-rule-2); border-radius: 0;
   padding: .6875rem .875rem; resize: none; min-height: 44px; max-height: 160px; line-height: 1.5;
 }
 .chat-composer textarea:focus { outline: 2px solid var(--chat-accent); outline-offset: 1px; }
 .chat-composer button {
-  font-family: var(--chat-sans); font-size: .875rem; font-weight: 600; color: #F4F2E7;
-  background: var(--chat-go); border: none; border-radius: 4px;
+  font-family: var(--chat-sans); font-size: .875rem; font-weight: 600; color: #F9FAFC;
+  background: var(--chat-go); border: none; border-radius: 0;
   padding: .6875rem 1.25rem; cursor: pointer; min-height: 44px;
 }
 .chat-composer button:disabled { opacity: .5; cursor: not-allowed; }
@@ -191,12 +191,12 @@
 
 .chat-setup {
   background: var(--chat-card); border: 1px dashed var(--chat-clay);
-  border-radius: 4px; padding: 1rem 1.25rem; margin-bottom: 1rem;
+  border-radius: 0; padding: 1rem 1.25rem; margin-bottom: 1rem;
 }
 .chat-setup h3 { margin: 0 0 .5rem; font-size: .9375rem; color: var(--chat-clay); }
 .chat-setup code {
   font-family: var(--chat-mono); font-size: .8125rem;
-  background: var(--chat-sunk); padding: .125rem .375rem; border-radius: 2px;
+  background: var(--chat-sunk); padding: .125rem .375rem; border-radius: 0;
 }
 
 /* Adding a staged text file to the knowledge base. Deliberately quieter than
@@ -215,7 +215,7 @@
 .chat .kb-add select {
   font-family: var(--chat-sans); font-size: .75rem; color: var(--chat-body);
   background: var(--chat-card); border: 1px solid var(--chat-rule);
-  border-radius: .25rem; padding: .125rem .375rem;
+  border-radius: 0; padding: .125rem .375rem;
 }
 .chat .kb-add button {
   font-family: var(--chat-sans); font-size: .75rem; color: var(--chat-body);
@@ -231,7 +231,7 @@
 /* The end of a planning session: the agreed videos, one per row, and the one
    button that sends them to render. */
 .chat .plan-confirm {
-  margin-top: .875rem; border: 1px solid var(--chat-rule); border-radius: 4px;
+  margin-top: .875rem; border: 1px solid var(--chat-rule); border-radius: 0;
   background: var(--chat-card); overflow: hidden;
 }
 .chat .plan-confirm .pc-head {
@@ -254,8 +254,8 @@
 .chat .plan-confirm .pc-note.bad { color: var(--chat-clay); }
 .chat .plan-confirm .pc-note.ok { color: var(--chat-go); }
 .chat .plan-confirm button {
-  font-family: var(--chat-sans); font-size: .8125rem; font-weight: 600; border: none; border-radius: 4px;
-  padding: .4375rem 1rem; cursor: pointer; background: var(--chat-go); color: #F4F2E7;
+  font-family: var(--chat-sans); font-size: .8125rem; font-weight: 600; border: none; border-radius: 0;
+  padding: .4375rem 1rem; cursor: pointer; background: var(--chat-go); color: #F9FAFC;
 }
 .chat .plan-confirm button:disabled { opacity: .5; cursor: not-allowed; }
 .chat .plan-confirm button[hidden] { display: none; }

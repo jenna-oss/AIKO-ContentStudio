@@ -63,7 +63,7 @@
     var video = el('video', { playsinline: true, preload: 'auto', style: { width: '100%', height: '100%', display: 'block', objectFit: 'contain' } });
     video.crossOrigin = 'anonymous';
     video.src = v.url;
-    var playerBox = el('div', { style: { aspectRatio: '9/16', background: '#000', borderRadius: '6px', overflow: 'hidden', maxHeight: 'calc(100vh - 20rem)', minHeight: '15rem', position: 'relative' } }, video);
+    var playerBox = el('div', { style: { aspectRatio: '9/16', background: '#101114', borderRadius: '0', overflow: 'hidden', maxHeight: 'calc(100vh - 20rem)', minHeight: '15rem', position: 'relative' } }, video);
     var markerBar = el('div', { 'aria-hidden': 'true', style: { position: 'relative', height: '12px' } });
     var scrub = el('input', { type: 'range', min: '0', max: '1', step: String(1 / FPS), value: '0', 'aria-label': 'Position in video', style: { width: '100%', margin: 0, accentColor: 'var(--emerald)' } });
     var playBtn = el('button', { type: 'button', class: 'btn btn-s btn-sm', style: { minWidth: '64px', padding: '0 8px' } }, 'Play');

@@ -1,43 +1,74 @@
-// The Buy Box brand, from its brand guide (v1.1, Sep 2026). A new video takes
-// its colors, fonts, logo and safe zone from here and nowhere else.
+// The AIKO Group brand (direction 8C: Instrument Serif and a tangerine rule, on
+// electric blue and tangerine). A new video takes its colours, fonts, wordmark
+// and safe zone from here and nowhere else.
 //
 // There are no layouts in this file on purpose: every video designs its own
 // scenes from scratch, for variety. What stays fixed is the brand.
 import React from "react";
-import { staticFile } from "remotion";
-import { loadFont as loadArchivo } from "@remotion/google-fonts/Archivo";
-import { loadFont as loadInter } from "@remotion/google-fonts/Inter";
+import { loadFont as loadInstrumentSerif } from "@remotion/google-fonts/InstrumentSerif";
+import { loadFont as loadPublicSans } from "@remotion/google-fonts/PublicSans";
+import { loadFont as loadPlexMono } from "@remotion/google-fonts/IBMPlexMono";
 
-const archivo = loadArchivo("normal", { weights: ["700", "800", "900"], subsets: ["latin"] });
-const inter = loadInter("normal", { weights: ["500", "600", "700", "800"], subsets: ["latin"] });
+const serif = loadInstrumentSerif("normal", { weights: ["400"], subsets: ["latin"] });
+loadInstrumentSerif("italic", { weights: ["400"], subsets: ["latin"] });
+const sans = loadPublicSans("normal", { weights: ["300", "400", "500", "600"], subsets: ["latin"] });
+const mono = loadPlexMono("normal", { weights: ["400", "500"], subsets: ["latin"] });
 
-/** Archivo: every headline, title and big number (weights 700-900). */
-export const HEAD = archivo.fontFamily;
-/** Inter: labels, captions and other small copy (weights 500-800). */
-export const BODY = inter.fontFamily;
+/** Instrument Serif, weight 400: every hook, headline, big number and the
+ *  wordmark. Roman for the statement, italic for the turn -- the word or
+ *  clause that reframes it, once per scene. Never negative tracking. */
+export const DISPLAY = serif.fontFamily;
+/** Public Sans: body copy only (300 for running text, 400-500 for UI). Never a hook. */
+export const TEXT = sans.fontFamily;
+/** IBM Plex Mono, 400-500: rail labels, counters, handles, eyebrows. Uppercase,
+ *  letterSpacing 0.2em-0.28em. */
+export const LABEL = mono.fontFamily;
 
-// Surfaces
-export const BLACK = "#000000";
-export const WHITE = "#FFFFFF";
-/** Secondary surface: panels and cards on white. */
-export const CONCRETE = "#E6E7E8";
-/** Secondary surface: small labels and rules. */
-export const GRAPHITE = "#6A6E72";
+// Grounds and inks.
+/** The workhorse ground: about a third of all scenes. */
+export const ELECTRIC = "#3150FD";
+/** Electric's equal partner, not an accent: grounds, blocks, the rule. */
+export const TANGERINE = "#FC3D05";
+export const PAPER = "#F3F5F9";
+/** Cards and tiles on Paper. */
+export const PAPER_RAISED = "#F9FAFC";
+/** Dark blue ground for dense data. */
+export const DEEP = "#0B1A5C";
+export const INK = "#101114";
+/** Hairlines and card borders on Paper. */
+export const LINE = "#D9DEE7";
+/** Secondary copy on Paper. */
+export const SLATE = "#3C4450";
+/** Secondary copy on Deep. */
+export const SKY = "#C3CCE8";
+/** Secondary copy on Tangerine. */
+export const INK_WARM = "#2A1305";
 
-// Accents. Each one means something, so the viewer learns to read them.
-/** Site Orange: the one thing to look at in a scene -- the problem, the cost, the key word or number. */
-export const ORANGE = "#FF5A1F";
-/** Pencil: the answer -- fundable, the fix, "after". */
-export const GREEN = "#0E7A42";
+export const PALETTE = [ELECTRIC, TANGERINE, PAPER, PAPER_RAISED, DEEP, INK, LINE, SLATE, SKY, INK_WARM] as const;
 
-export const PALETTE = [BLACK, WHITE, CONCRETE, GRAPHITE, ORANGE, GREEN] as const;
+/** What may sit on each ground. These are the only legal pairings: Tangerine
+ *  type only ever on Ink, never on Paper, Electric or Deep; Electric and
+ *  Tangerine meet as blocks, never as type on type. The rule is Tangerine
+ *  everywhere except on Tangerine, where it is Ink. */
+export const ON = {
+  [ELECTRIC]: { type: [PAPER], secondary: PAPER, rule: TANGERINE },
+  [TANGERINE]: { type: [INK], secondary: INK_WARM, rule: INK },
+  [PAPER]: { type: [INK, ELECTRIC], secondary: SLATE, rule: TANGERINE },
+  [PAPER_RAISED]: { type: [INK, ELECTRIC], secondary: SLATE, rule: TANGERINE },
+  [INK]: { type: [PAPER, TANGERINE], secondary: PAPER, rule: TANGERINE },
+  [DEEP]: { type: [PAPER], secondary: SKY, rule: TANGERINE },
+} as const;
+export type Ground = keyof typeof ON;
 
 export const W = 1080;
 export const H = 1920;
 
-/** The Reels safe zone (page 5 of the guide), in px from each edge. Text and
- *  faces stay inside it, clear of the top bar, the like/comment/share column
- *  on the right, and the caption and handle at the bottom. */
+/** Brand margin on a 1080 canvas: 88px. */
+export const MARGIN = 88;
+
+/** The Reels safe zone, in px from each edge. Text and faces stay inside it,
+ *  clear of the top bar, the like/comment/share column on the right, and the
+ *  caption and handle at the bottom. Wider than the brand margin, so it wins. */
 export const SAFE = { top: 180, right: 150, bottom: 440, left: 110 } as const;
 export const SAFE_W = W - SAFE.left - SAFE.right;
 
@@ -60,10 +91,8 @@ export const SAFE_SLACK = 40;
  *  Full-bleed backgrounds and footage go outside it; text goes inside.
  *  Plumbing, not a layout -- what goes in it is designed per scene.
  *
- *  A flex column, so a scene's alignItems / justifyContent take effect. It
- *  was a plain block, which silently ignored them: every scene that asked to
- *  be centred stacked top-left instead (found 2026-09-19). With no style it
- *  still stacks top to bottom at full width, as a block did. */
+ *  A flex column, so a scene's alignItems / justifyContent take effect. With
+ *  no style it stacks top to bottom at full width. */
 export const SafeArea: React.FC<{ children?: React.ReactNode; style?: React.CSSProperties }> = ({ children, style }) =>
   React.createElement(
     "div",
@@ -77,29 +106,36 @@ export const SafeArea: React.FC<{ children?: React.ReactNode; style?: React.CSSP
     children,
   );
 
-/** The opening photograph's black frame: a tall rectangle of picture with
- *  black around it, and the scene's headline boxes straddling one of its
- *  edges, half on the picture and half on the black. Two placements, so the
- *  videos don't all open the same way: `high` puts the picture up and the
- *  words across its bottom edge, `low` puts it down and the words across its
- *  top edge. Same size either way; the numbers live here, not in each
- *  video's own file. */
-export const PHOTO_FRAME = {
-  left: 90,
-  width: 900,
-  /** Picture up, words across its bottom edge. */
-  high: { top: 150, height: 1150, bottom: 1300 },
-  /** Picture down, words across its top edge. Shorter, because both stop at
-   *  the same line: any lower and the captions would sit on the picture. */
-  low: { top: 430, height: 870, bottom: 1300 },
-};
-
-/** Text-size floors, px on the 1080x1920 frame. */
+/** Text-size floors, px on the 1080x1920 frame. The brand's floor for body
+ *  copy on a 1080 canvas is 36px; this keeps a little above it. */
 export const MIN_HEADLINE = 110;
 export const MIN_TEXT = 40;
 
-export const HANDLE = "@thebuyboxre";
-/** The logo drawn in white, for black backgrounds. */
-export const LOGO_WHITE = staticFile("brand/logo-white.svg");
-/** The logo drawn in black, for white and concrete backgrounds. */
-export const LOGO_BLACK = staticFile("brand/logo-black.svg");
+/** Display line-height: 0.92-0.98. Body: 1.24-1.7. */
+export const DISPLAY_LEADING = 0.95;
+
+// TODO(AIKO): confirm the Instagram/TikTok handle before the first render that posts.
+export const HANDLE = "@aikogroup";
+
+/** The wordmark: roman caps AIKO and italic Group, with a rule above. There is
+ *  no symbol; the rule is the mark. `size` is the type size in px. Colours
+ *  follow the ground: Paper on Electric, Ink on Tangerine (rule Ink too), on
+ *  Paper AIKO in Ink and Group in Electric. On Ink or Deep, Paper. */
+export const Wordmark: React.FC<{ ground: Ground; size?: number; style?: React.CSSProperties }> = ({ ground, size = 96, style }) => {
+  const cap = size * 0.7;
+  const onLight = ground === PAPER || ground === PAPER_RAISED;
+  const word = ground === TANGERINE || onLight ? INK : PAPER;
+  const group = onLight ? ELECTRIC : word;
+  return React.createElement(
+    "div",
+    { style: { display: "inline-flex", flexDirection: "column", alignItems: "flex-start", gap: cap / 8, ...style } },
+    // Rule: about 1.3x the cap height wide, a quarter of it thick.
+    React.createElement("div", { style: { width: cap * 1.3, height: cap / 4, backgroundColor: ON[ground].rule } }),
+    React.createElement(
+      "div",
+      { style: { fontFamily: DISPLAY, fontWeight: 400, fontSize: size, lineHeight: 0.9, letterSpacing: "0.005em", color: word, whiteSpace: "nowrap" } },
+      "AIKO ",
+      React.createElement("span", { style: { fontStyle: "italic", color: group } }, "Group"),
+    ),
+  );
+};

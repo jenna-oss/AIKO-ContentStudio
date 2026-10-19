@@ -1,8 +1,14 @@
 import { Composition } from "remotion";
-import { FrameExample } from "./FrameExample";
+import { ExampleVideo } from "./ExampleVideo";
 import { Clip, type ClipProps } from "./Clip";
 
 const FPS = 30;
+
+// Sum of all sequence durations minus the overlap eaten by each of the
+// 4 swipe transitions (0.35s each) between the 5 scenes. A generated video's
+// durations come from the actual ElevenLabs narration timestamps, so the video
+// is timed to the voice, not guessed.
+const EXAMPLE_TOTAL_S = 4 + 4 + 4.5 + 4.5 + 4 - 4 * 0.35;
 
 export const RemotionRoot: React.FC = () => {
   return (
@@ -23,9 +29,9 @@ export const RemotionRoot: React.FC = () => {
         })}
       />
       <Composition
-        id="FrameExample"
-        component={FrameExample}
-        durationInFrames={30}
+        id="Example"
+        component={ExampleVideo}
+        durationInFrames={Math.round(EXAMPLE_TOTAL_S * FPS)}
         fps={FPS}
         width={1080}
         height={1920}

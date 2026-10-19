@@ -634,7 +634,7 @@
   }
   function openPrompter() {
     var lines = script ? script.lines : [];
-    var close = el('button', { type: 'button', class: 'btn', style: { alignSelf: 'flex-end', color: '#fff', border: '1px solid #6A6E72', background: 'transparent' } }, 'Close');
+    var close = el('button', { type: 'button', class: 'btn', style: { alignSelf: 'flex-end', color: '#F3F5F9', border: '1px solid #3C4450', background: 'transparent' } }, 'Close');
     var p = el('div', { class: 'prompter', role: 'dialog', 'aria-label': 'Teleprompter' }, el('div', { class: 'inner' }, close, lines.map(function (l) { return el('p', { text: l }); })));
     function shut() { p.remove(); document.removeEventListener('keydown', esc); }
     function esc(e) { if (e.key === 'Escape') shut(); }
@@ -1041,7 +1041,7 @@
       el('span', { class: 'quiet', text: script ? 'Script: ' + script.topic : 'No script. Film whatever you like; the best moments are found for you.' }),
       el('div', { class: 'card', style: { padding: '22px', display: 'flex', flexDirection: 'column', gap: '14px' } },
         ['Hold the phone upright', 'Face a window for light', 'Mistakes are fine. Pause and say the line again.'].map(function (t) {
-          return el('div', { class: 'row ink', html: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#2C785E" stroke-width="2"></circle><path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="#2C785E" stroke-width="2"></path></svg>' }, el('span', { text: t }));
+          return el('div', { class: 'row ink', html: '<svg width="20" height="20" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="10" fill="none" stroke="#3150FD" stroke-width="2"></circle><path d="M8 12.5l2.5 2.5L16 9.5" fill="none" stroke="#3150FD" stroke-width="2"></path></svg>' }, el('span', { text: t }));
         })),
       script ? el('div', {}, el('button', { type: 'button', class: 'btn btn-s', onclick: openPrompter }, 'Open teleprompter')) : null);
   }
@@ -1094,7 +1094,7 @@
     }
     picker.addEventListener('change', function () { pick(picker.files[0]); });
     var drop = el('div', { style: { border: '2px dashed var(--strong)', borderRadius: '4px', padding: '48px 20px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: '12px', textAlign: 'center' } },
-      el('span', { html: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#2C785E" stroke-width="2" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg>' }),
+      el('span', { html: '<svg width="36" height="36" viewBox="0 0 24 24" fill="none" stroke="#3150FD" stroke-width="2" aria-hidden="true"><path d="M12 16V4M6 10l6-6 6 6M4 20h16"></path></svg>' }),
       el('span', { class: 'ink', style: { fontWeight: 600 }, text: 'Drop the video here' }),
       el('button', { type: 'button', class: 'btn btn-p', onclick: function () { picker.click(); } }, 'Choose file'),
       el('span', { class: 'quiet', text: 'mp4, mov, mkv or webm, up to 5GB' }), picker);
@@ -1159,7 +1159,7 @@
         var set = function (k) { return function (e) { r[k] = e.target.value; r.error = ''; save(); var c = e.target.parentNode.querySelector('[data-count]'); if (c) c.textContent = e.target.value.length + ' / ' + (k === 'yt' ? 100 : 2200); }; };
         var row = el('div', { style: { padding: '14px 0', borderBottom: '1px solid var(--rule)', display: 'flex', flexDirection: 'column', gap: '10px' } },
           el('div', { class: 'row', style: { gap: '14px' } },
-            el('video', { src: v.url ? v.url.split('#')[0] + '#t=1' : '', preload: 'metadata', muted: true, 'aria-hidden': 'true', style: { width: '32px', height: '56px', objectFit: 'cover', borderRadius: '3px', background: '#000' } }),
+            el('video', { src: v.url ? v.url.split('#')[0] + '#t=1' : '', preload: 'metadata', muted: true, 'aria-hidden': 'true', style: { width: '32px', height: '56px', objectFit: 'cover', borderRadius: '3px', background: '#101114' } }),
             el('span', { class: 'ink grow', style: { fontWeight: 600, flexBasis: '160px' }, text: v.topic || 'Untitled' }),
             el('input', { type: 'date', class: 'field', 'aria-label': 'Date for ' + (v.topic || 'this video'), value: r.date, style: { width: 'auto', minHeight: '40px' }, oninput: set('date') }),
             el('input', { type: 'time', class: 'field', 'aria-label': 'Time for ' + (v.topic || 'this video'), value: r.time, style: { width: 'auto', minHeight: '40px' }, oninput: set('time') }),
@@ -1193,7 +1193,7 @@
   function drawDone() {
     var b = f.lastBatch || [];
     main.append(el('div', { style: { textAlign: 'center', display: 'flex', flexDirection: 'column', gap: '14px', alignItems: 'center', marginTop: '20px' } },
-      el('span', { html: '<svg width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#2C785E"></circle><path d="M7 12.5l3.2 3L17 9" fill="none" stroke="#fff" stroke-width="2"></path></svg>' }),
+      el('span', { html: '<svg width="48" height="48" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="11" fill="#3150FD"></circle><path d="M7 12.5l3.2 3L17 9" fill="none" stroke="#F3F5F9" stroke-width="2"></path></svg>' }),
       el('h1', { text: A.plural(b.length, 'video') + ' scheduled' }),
       f.lastPlats ? el('span', { class: 'quiet', text: 'Going to ' + A.joinNames(f.lastPlats.map(function (k) { return NAMES[k]; })) }) : null),
       el('div', { class: 'card', style: { padding: '4px 20px' } }, b.map(function (x) {

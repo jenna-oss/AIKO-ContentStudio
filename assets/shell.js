@@ -212,7 +212,7 @@
     document.addEventListener('keydown', function (e) { if (e.key === 'Escape') close(); });
 
     var head = el('header', { class: 'app-head' },
-      el('a', { class: 'app-brand', href: './?home', title: 'Home', html: '<svg width="28" height="28" viewBox="0 0 30 30" aria-hidden="true"><circle cx="15" cy="15" r="13.5" fill="none" stroke="#6E9C86" stroke-width="1.4"></circle><text x="15" y="18" text-anchor="middle" font-size="7" font-weight="700" fill="#EAE9D5" font-family="Poppins, sans-serif">AIKO</text></svg><span>Content studio</span>' }),
+      el('a', { class: 'app-brand', href: './?home', title: 'Home', html: '<span class="wm"><span>AIKO <em>Group</em></span></span><span class="app-name">Content Studio</span>' }),
       tabs,
       el('div', { class: 'app-right' }, researchBtn, avatar, research, menu));
     document.body.prepend(head);

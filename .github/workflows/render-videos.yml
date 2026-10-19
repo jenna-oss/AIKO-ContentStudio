@@ -125,36 +125,9 @@ jobs:
             : typeof v === 'string' ? v.trim() : v == null ? '' : String(v).trim();
           const nameOf = (topic) => String(topic).toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '').slice(0, 48);
 
-          /* Every video opens on a photo from the channel's library, and each
-           * render chose with no idea what the others had, so the same one kept
-           * coming back. Photos the newest videos used are left out, newest
-           * video first, until only KEEP_FRESH would be left to choose from;
-           * the pipeline then picks whichever of the rest fits. Videos in one
-           * batch render side by side, so each also gets the remaining photos
-           * in a different order, to break ties differently. Losing the history
-           * costs the rotation, not the render. */
-          const KEEP_FRESH = 6;
-          const { readdirSync } = await import('node:fs');
-          const LIBRARY = readdirSync('video/remotion/public/library').filter((f) => f.endsWith('.jpg')).sort();
-          let recent = [];
-          try {
-            recent = await call('kb_recent_photos', { p_videos: 12 });
-          } catch (err) {
-            console.error(`${err.message}; no photos left out this time`);
-          }
-          const avoid = new Set();
-          for (const row of recent) {
-            const used = (Array.isArray(row.photos) ? row.photos : []).filter((p) => LIBRARY.includes(p) && !avoid.has(p));
-            if (LIBRARY.length - avoid.size - used.length < KEEP_FRESH) break;
-            used.forEach((p) => avoid.add(p));
-          }
-          const fresh = LIBRARY.filter((p) => !avoid.has(p));
-          const photosFor = (i, of) => {
-            const step = Math.max(1, Math.ceil(fresh.length / Math.max(1, of)));
-            const at = (i * step) % Math.max(1, fresh.length);
-            return { photos_avoid: [...avoid], photos_order: [...fresh.slice(at), ...fresh.slice(0, at)] };
-          };
-          console.error(`Photos left out as recently used: ${[...avoid].join(', ') || '(none)'}`);
+          /* Videos open on a brand device (the hard horizon or a cropped word), not a
+           * library photo, so there is no photo rotation to pass along. */
+          const photosFor = () => ({});
 
           const editId = (process.env.EDIT_ID || '').trim();
           if (editId) {

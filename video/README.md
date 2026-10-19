@@ -1,8 +1,8 @@
-# The Buy Box Video Pipeline
+# AIKO Video Pipeline
 
 Automated topic-to-video pipeline: give it a topic (a short description or a
 source article URL) and it produces a finished, voiced, vertical (1080x1920)
-video for the account's real-estate/finance content series.
+video for AIKO's content series.
 
 See [`PIPELINE_SPEC.html`](./PIPELINE_SPEC.html) for the full design spec
 (stages, the hook-selection logic, the asset QA rubric).
@@ -13,13 +13,16 @@ See [`PIPELINE_SPEC.html`](./PIPELINE_SPEC.html) for the full design spec
   orchestration script (run via Claude Code's Workflow tool).
   - `src/` holds one `.tsx` file per generated video, each designed from
     scratch.
-  - `src/brand.ts` is The Buy Box brand, from its brand guide: colors, fonts
-    (Archivo and Inter), logo, the Reels safe zone and text-size floors.
+  - `src/brand.ts` is the AIKO brand system (direction 8C): the ten colours
+    and which type is legal on which ground, the three families (Instrument
+    Serif, Public Sans, IBM Plex Mono), the rule-above wordmark, the Reels safe
+    zone and text-size floors.
+  - `src/ExampleVideo.tsx` is the reference the pipeline reads for mechanics:
+    transitions, footage, captions, the hard horizon, the cropped word and the
+    closing frame. Render it with `npx remotion still src/index.ts Example`.
   - `src/Captions.tsx` is the word-synced caption overlay every video carries.
   - `brand-lint.mjs` checks a video against the brand's rules, never its
     layout.
-  - The older `components/`, `tokens.ts` and `fonts.ts` are the pre-brand
-    look, kept for the videos made with them.
   - `voiceover_TEMPLATE.py` + `numeric_tts.py` are the canonical
     timestamp-driven ElevenLabs voiceover every video uses. It also writes the
     captions' word timings.
@@ -91,15 +94,13 @@ fixes what it finds once and looks again; anything still wrong is written to
 anything -- the output is meant for human review before it goes anywhere
 public.
 
-## The photo library
+## Openings
 
-`remotion/public/library` holds the channel's own photographs, the look of the
-life the deal pays for. Every video opens on one of them, full-bleed behind the
-text, and up to two more may appear in its first half; the rest of the footage
-still comes from Pexels. To add one: put a web-sized `.jpg` in that folder and
-add a line to `PHOTO_LIBRARY` in `remotion/pipeline_workflow.mjs` saying what it
-shows, which is what the planning stage picks from and what the rules check
-against. To retire one, remove both.
+There is no photo library. Every video opens on one of the brand's two
+signature devices: the hard horizon (an Electric field meeting a Tangerine
+field, the line landing half on each) or a cropped word on Electric or
+Tangerine. The Visual Plan stage enforces it, along with the grid rhythm:
+Electric on at least a quarter of the scenes, Tangerine at most twice in nine.
 
 ## Editing a clip
 
