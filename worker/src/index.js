@@ -33,16 +33,16 @@ import { handleLibrary } from './library.js';
 /* Only the published pages may call this. The key lives here, so an open
  * endpoint would let anyone spend it. */
 const ALLOWED_ORIGINS = new Set([
-  'https://trilith-marketing-tool.vercel.app',
   'https://jenna-oss.github.io',
   'http://localhost:8788',
+  'http://localhost:8792',
 ]);
 
-/* Vercel gives every preview deployment its own subdomain, so a branch build
- * would be blocked by an exact-match list alone. Scope the pattern to this
- * project rather than all of *.vercel.app — anyone can deploy there, and a
- * blanket wildcard would hand the API key to whoever did. */
-const PREVIEW_ORIGIN = /^https:\/\/trilith-marketing-tool-[a-z0-9-]+\.vercel\.app$/;
+/* If the pages move to Vercel, every preview deployment gets its own
+ * subdomain. Scope the pattern to this project rather than all of
+ * *.vercel.app — anyone can deploy there, and a blanket wildcard would hand
+ * the API key to whoever did. */
+const PREVIEW_ORIGIN = /^https:\/\/aiko-content-studio-[a-z0-9-]+\.vercel\.app$/;
 
 const isAllowed = (origin) => ALLOWED_ORIGINS.has(origin) || PREVIEW_ORIGIN.test(origin);
 
@@ -139,7 +139,7 @@ export default {
       }
     }
 
-    /* Connecting The Buy Box's four accounts through Upload-Post. */
+    /* Connecting AIKO's four accounts through Upload-Post. */
     if (path.startsWith('/social/')) {
       try { return await handleSocial(path, request, env, headers, ctx, gate.user); }
       catch (err) {

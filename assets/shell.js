@@ -9,7 +9,7 @@
 (function () {
   'use strict';
 
-  var WORKER = 'https://aiko-studio.YOUR-SUBDOMAIN.workers.dev';
+  var WORKER = 'https://aiko-studio.jenna-cbd.workers.dev';
   var FLOW_KEY = 'aiko-flow';
 
   /* --- small helpers ----------------------------------------------------- */

@@ -44,7 +44,7 @@ let photos = 0;
 /* Upload-Post: the profile it reports, its Pages, how /upload answers, and
  * what the status call says, run by run. */
 const PROFILE = () => ({
-  username: 'thebuybox',
+  username: 'aikogroup',
   social_accounts: {
     youtube: { handle: '@thebuyboxre', display_name: 'The Buy Box' },
     instagram: { username: 'thebuyboxre', display_name: 'The Buy Box' },
@@ -155,7 +155,7 @@ globalThis.fetch = async (url, init = {}) => {
   if (/\/v25\.0\/\d+\/feed$/.test(u)) return jsonRes({ id: 'FEED-1' });
   if (u.startsWith('https://api.upload-post.com/api/')) {
     const path = new URL(u).pathname.replace('/api', '');
-    if (path === '/uploadposts/users/thebuybox') {
+    if (path === '/uploadposts/users/aikogroup') {
       return upProfile ? jsonRes({ success: true, profile: upProfile }) : jsonRes({ success: false, message: 'not found' }, 404);
     }
     if (path === '/uploadposts/users' && init.method === 'POST') { upProfile = PROFILE(); return jsonRes({ success: true }, 201); }
@@ -770,7 +770,7 @@ j = await res.json();
 const createdProfile = upCalls().find((c) => c.url.endsWith('/api/uploadposts/users') && c.body?.username);
 const jwt = upCalls().find((c) => c.url.endsWith('/generate-jwt'));
 check('connecting makes the profile the first time, then hands back Upload-Post’s own page',
-  res.status === 200 && j.url === 'https://app.upload-post.com/connect?token=JWT' && createdProfile?.body.username === 'thebuybox',
+  res.status === 200 && j.url === 'https://app.upload-post.com/connect?token=JWT' && createdProfile?.body.username === 'aikogroup',
   JSON.stringify({ status: res.status, j, made: createdProfile?.body }));
 check('...for all four platforms, coming back to the Schedule page',
   ['instagram', 'facebook', 'youtube', 'tiktok'].every((p) => jwt?.body.platforms.includes(p))
@@ -821,7 +821,7 @@ check('with Upload-Post set, a due post is sent there and not to Meta',
   sent && !calls.some((c) => c.url.includes('graph.facebook.com')) && rpcs('kb_meta_secret').length === 0,
   JSON.stringify(sent));
 check('...as the video url, to the one platform, in the background, with our id on it',
-  sent['platform[]'] === 'youtube' && sent.video === 'https://videos.example/a.mp4' && sent.user === 'thebuybox'
+  sent['platform[]'] === 'youtube' && sent.video === 'https://videos.example/a.mp4' && sent.user === 'aikogroup'
   && sent.async_upload === 'true' && sent.external_id === '55555555-5555-4555-8555-555555555555',
   JSON.stringify(sent));
 check('...with the YouTube title and the caption as its description, public',

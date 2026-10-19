@@ -47,3 +47,6 @@ video/remotion/.run/
 content/own/*
 !content/own/.gitkeep
 data/content.json
+
+# The Supabase CLI's link state (project ref, pooler URL, version cache).
+supabase/.temp/

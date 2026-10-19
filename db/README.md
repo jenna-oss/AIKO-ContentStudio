@@ -1,17 +1,22 @@
 # Schema
 
-The `kb` schema is defined by 47 migrations applied to the Supabase project
-`YOUR-PROJECT-REF`, listed below in order. They are **not** duplicated here
-as files, for the same reason `adspy` and `content` are not: Supabase holds the
-authoritative record in `supabase_migrations.schema_migrations`, and a
-hand-maintained second copy drifts. `data/sql/` holds data loads, never DDL.
+The database is the Supabase project `kgagmkodufrmxrafthre` (AIKO Content
+Studio, us-west-1). Its schema is the migrations in `supabase/migrations/`,
+applied in order: the 73 the Trilith tool built up, copied from that project's
+history on 2026-10-19 with the brand seed and default slug changed to `aiko`,
+plus `20261019030000_adspy_aiko_category`, which filters ads by what they sell
+instead of a loan product and audience. Migrations from `kb_scoring` on start
+with `set search_path` so pgvector resolves when the CLI replays them.
 
-To pull them into this repo as files:
+To change the schema, add a file to `supabase/migrations/` and:
 
 ```bash
-npx supabase link --project-ref YOUR-PROJECT-REF
-npx supabase db pull
+npx supabase link --project-ref kgagmkodufrmxrafthre
+npx supabase db push
 ```
+
+`data/sql/` holds data loads, never DDL. The table below describes the original
+migrations; the numbers are the order they were written in.
 
 ## The migrations
 

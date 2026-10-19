@@ -2,7 +2,7 @@
  * /meta/* — connecting the Facebook Page, and the Instagram account linked to
  * it, that the app publishes to.
  *
- * This is Facebook Login, not Instagram Login. The Buy Box's accounts live in
+ * This is Facebook Login, not Instagram Login. AIKO's accounts live in
  * a Meta Business Portfolio with admins rather than a shared password, so the
  * person who connects signs in as themselves on Facebook's own page and picks
  * the Page. One approval covers both: the Page posts with its own token, and

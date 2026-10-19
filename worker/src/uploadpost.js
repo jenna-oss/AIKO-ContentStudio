@@ -1,5 +1,5 @@
 /* ---------------------------------------------------------------------------
- * /social/* — connecting The Buy Box's accounts through Upload-Post, and the
+ * /social/* — connecting AIKO's accounts through Upload-Post, and the
  * publishing half the scheduler calls.
  *
  * Upload-Post runs apps that Meta, Google and TikTok have already approved, so
@@ -18,8 +18,8 @@ import { rpc } from './db.js';
 const API = 'https://api.upload-post.com/api';
 export const SOCIAL = ['instagram', 'facebook', 'youtube', 'tiktok'];
 
-/* The profile inside Upload-Post that The Buy Box's accounts belong to. */
-const profileName = (env) => env.UPLOAD_POST_PROFILE || 'thebuybox';
+/* The profile inside Upload-Post that AIKO's accounts belong to. */
+const profileName = (env) => env.UPLOAD_POST_PROFILE || 'aikogroup';
 
 const json = (obj, status, headers) => new Response(JSON.stringify(obj), {
   status, headers: { ...headers, 'content-type': 'application/json' },
@@ -81,7 +81,7 @@ const str = (v, max) => String(v ?? '').trim().slice(0, max);
 
 /* A YouTube title has to exist and stop at 100. The post's own title if it
  * has one, else the caption's first line. */
-const youtubeTitle = (post) => str(post.title || String(post.caption || '').split('\n')[0] || 'The Buy Box', 100);
+const youtubeTitle = (post) => str(post.title || String(post.caption || '').split('\n')[0] || 'AIKO Group', 100);
 
 /* Hand Upload-Post the video. async_upload means it answers at once with a
  * request id and fetches the file itself; the status call says how it went. */
@@ -223,7 +223,7 @@ export async function handleSocial(path, request, env, headers, ctx, user) {
           platforms: SOCIAL,
           redirect_url: origin ? `${origin}/schedule.html` : undefined,
           redirect_button_text: 'Back to the Schedule page',
-          connect_title: 'Connect The Buy Box',
+          connect_title: 'Connect AIKO Group',
           connect_description: 'Sign in to each account on its own page. Posts are scheduled from the marketing tool.',
           show_calendar: false,
           language: 'en',

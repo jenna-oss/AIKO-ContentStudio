@@ -7,8 +7,8 @@ compatibility_flags = ["nodejs_compat"]
 
 # Not a secret: this URL ships in every Supabase client app.
 [vars]
-# Set to the AIKO Content Studio project, never Trilith's shared one.
-SUPABASE_URL = "https://YOUR-PROJECT-REF.supabase.co"
+# The AIKO Content Studio project (us-west-1), never Trilith's shared one.
+SUPABASE_URL = "https://kgagmkodufrmxrafthre.supabase.co"
 # Where /videos/edit starts render-videos.yml.
 GITHUB_REPO = "jenna-oss/AIKO-ContentStudio"
 
@@ -38,12 +38,12 @@ crons = ["*/5 * * * *"]
 # is no YouTube or TikTok audit to pass. The Schedule page's Connect button
 # opens Upload-Post's page, where each account is signed in to on its own site.
 # UPLOAD_POST_PROFILE (a var, optional) names the profile; it defaults to
-# thebuybox and is made the first time it is needed.
+# aikogroup and is made the first time it is needed.
 #
 # The Meta keys below are the fallback, used only when UPLOAD_POST_API_KEY is
 # not set. They are what lets the Schedule page publish to the Facebook Page and
 # the Instagram account linked to it. The app id and secret come from a Business
-# app at developers.facebook.com, owned by the Trilith Funding Business
+# app at developers.facebook.com, owned by the AIKO Group Business
 # Portfolio, with Facebook Login for Business added and this Worker's
 # /meta/callback registered as a Valid OAuth Redirect URI. There is no password
 # here: whoever connects signs in as themselves on Facebook and picks the Page.
@@ -52,7 +52,6 @@ crons = ["*/5 * * * *"]
 #
 # META_TOKEN_KEY is 32 random bytes, base64, and it is ours, not Meta's.
 # The Page tokens are encrypted with it before they are stored, because this
-# Supabase project is shared with other AIKO tools and anything holding its
 # anon key can read the row. Make one with:
 #
 #   node -e "console.log(require('crypto').randomBytes(32).toString('base64'))"
